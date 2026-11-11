@@ -5,7 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:mock": "VITE_CONCURRO_DATA=mock vite dev",
 		"build": "vite build",
+		"build:mock": "VITE_CONCURRO_DATA=mock vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
 	},

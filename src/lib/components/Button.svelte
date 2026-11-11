@@ -8,9 +8,11 @@
 		size?: 'sm' | 'md';
 		icon?: IconType;
 		href?: string;
+		/** Navigate with a full page load (for backend routes such as sign-in). */
+		reload?: boolean;
 		children?: Snippet;
 	}
-	let { variant = 'default', size = 'md', icon, href, children, type = 'button', ...rest }: Props = $props();
+	let { variant = 'default', size = 'md', icon, href, reload = false, children, type = 'button', ...rest }: Props = $props();
 	const Icon = $derived(icon);
 </script>
 
@@ -20,7 +22,7 @@
 {/snippet}
 
 {#if href}
-	<a class="btn {variant} {size}" {href}>{@render content()}</a>
+	<a class="btn {variant} {size}" {href} data-sveltekit-reload={reload || undefined}>{@render content()}</a>
 {:else}
 	<button class="btn {variant} {size}" {type} {...rest}>{@render content()}</button>
 {/if}

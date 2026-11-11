@@ -1,3 +1,3 @@
-import { api } from '#lib/mock/api.ts';
+import { api } from '#lib/api/index.ts';
 
 export const load = () => ({ result: api.operator() });

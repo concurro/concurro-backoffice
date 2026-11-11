@@ -13,8 +13,9 @@
 	import Tabs from '#lib/components/Tabs.svelte';
 	import TaskSignals from '#lib/components/TaskSignals.svelte';
 	import { duration, relTime, taskHref } from '#lib/format.ts';
+	import { withBase } from '#lib/paths.ts';
 	import { roleLabel, taskStageMeta } from '#lib/meta.ts';
-	import { profile } from '#lib/mock/reference.ts';
+	import { profile } from '#lib/api/index.ts';
 	import type { ActionsRun, Stage, Task, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
@@ -133,9 +134,9 @@
 							{#each runs as run (run.id)}
 								<tr>
 									<td class="mono nowrap">{run.id}</td>
-									<td class="title"><a href="/tasks/{target.owner}/{target.repo}/{run.issue}/turns/{run.turn}">{run.title}</a></td>
+									<td class="title"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}/turns/${run.turn}`)}>{run.title}</a></td>
 									<td><Badge tone={runTone[run.status]}>{run.status}</Badge></td>
-									<td class="mono nowrap"><a href="/tasks/{target.owner}/{target.repo}/{run.issue}">#{run.issue}</a></td>
+									<td class="mono nowrap"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}`)}>#{run.issue}</a></td>
 									<td class="r nowrap muted">{relTime(run.startedAt)}</td>
 									<td class="r nowrap">{duration(run.durationS * 1000)}</td>
 								</tr>

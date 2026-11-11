@@ -1,5 +1,5 @@
 import { store } from '#lib/state/store.svelte.ts';
-import type { NeedsYouItem, Target, Task } from '#lib/types.ts';
+import type { Target, Task } from '#lib/types.ts';
 import { activity, runsFor, usage } from './account';
 import { operator } from './operator';
 import { ME, targets } from './reference';
@@ -31,19 +31,6 @@ const findTask = (owner: string, repo: string, issue: number): Task => {
 	if (!t) throw new NotFound(`${owner}/${repo}#${issue} is not enrolled in Concurro.`);
 	return t;
 };
-
-export function needsYou(tasks: Task[]): NeedsYouItem[] {
-	const items: NeedsYouItem[] = [];
-	for (const task of tasks) {
-		if (task.stage === 'planned' && task.mode === 'manual')
-			items.push({ kind: 'plan_approval', task, text: `Plan v${task.plans.at(-1)?.version} is waiting for a writer’s approval` });
-		if (task.stage === 'clarify') items.push({ kind: 'input_needed', task, text: task.question ?? 'Triage asked a question' });
-		if (task.paused && task.sponsor === ME) items.push({ kind: 'credentials', task, text: task.pauseReason ?? 'Paused: awaiting credentials' });
-		if (task.pr?.ci === 'failing' && task.sponsor === ME)
-			items.push({ kind: 'ci_red', task, text: `CI is failing on head ${task.pr.headSha}` });
-	}
-	return items;
-}
 
 export const api = {
 	overview: () => delay(() => ({ tasks: store.tasks, targets, activity })),

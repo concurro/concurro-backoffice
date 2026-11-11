@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { RefreshCw } from 'lucide-svelte';
 	import { refreshAll } from '$app/navigation';
+	import { withBase } from '#lib/paths.ts';
 	import Alert from './Alert.svelte';
 	import Button from './Button.svelte';
 
@@ -12,6 +13,6 @@
 	{message}
 	{#snippet actions()}
 		<Button size="sm" icon={RefreshCw} onclick={() => refreshAll()}>Retry</Button>
-		<Button size="sm" variant="ghost" href="/">Overview</Button>
+		<Button size="sm" variant="ghost" href={withBase('/')}>Overview</Button>
 	{/snippet}
 </Alert>

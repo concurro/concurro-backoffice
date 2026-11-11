@@ -1,4 +1,4 @@
-import { api } from '#lib/mock/api.ts';
+import { api } from '#lib/api/index.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = ({ params }) => ({

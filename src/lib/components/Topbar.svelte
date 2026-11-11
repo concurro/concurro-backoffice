@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ChevronRight, Menu, Search } from 'lucide-svelte';
 	import { page } from '$app/state';
+	import { withBase } from '#lib/paths.ts';
 	import { ui } from '#lib/state/ui.svelte.ts';
 	import UserMenu from './UserMenu.svelte';
 
@@ -13,8 +14,8 @@
 	const crumbs = $derived.by((): Crumb[] => {
 		const { owner, repo, issue, turn } = page.params;
 		const id = page.route.id ?? '';
-		const target: Crumb = { label: `${owner}/${repo}`, href: `/targets/${owner}/${repo}`, mono: true };
-		const task: Crumb = { label: `Issue #${issue}`, href: `/tasks/${owner}/${repo}/${issue}` };
+		const target: Crumb = { label: `${owner}/${repo}`, href: withBase(`/targets/${owner}/${repo}`), mono: true };
+		const task: Crumb = { label: `Issue #${issue}`, href: withBase(`/tasks/${owner}/${repo}/${issue}`) };
 		if (id.includes('/turns')) return [target, task, { label: turn ? `Turn ${turn}` : 'Run diagnostics' }];
 		if (id.includes('/tasks/')) return [target, { label: task.label }];
 		if (id.includes('/targets/')) return [{ label: 'Targets' }, { label: target.label, mono: true }];

@@ -12,7 +12,7 @@
 	import Tabs from '#lib/components/Tabs.svelte';
 	import { absTime, duration, parseUnified, relTime } from '#lib/format.ts';
 	import { outcomeMeta, roleLabel, stageMeta } from '#lib/meta.ts';
-	import { profile } from '#lib/mock/reference.ts';
+	import { profile } from '#lib/api/index.ts';
 	import type { Tone, TranscriptItem, Turn } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
@@ -60,7 +60,7 @@
 		</header>
 		<dl class="facts num">
 			<div><dt>Role</dt><dd>{roleLabel[turn.role]} <span class="mono muted">{turn.agent}</span></dd></div>
-			<div><dt>Profile</dt><dd><span class="mono">{turn.profile}</span> <span class="muted">{p.provider} · {p.model} · {p.effort}</span></dd></div>
+			<div><dt>Profile</dt><dd><span class="mono">{turn.profile}</span> <span class="muted">{[p.provider, p.model, p.effort].filter(Boolean).join(" · ")}</span></dd></div>
 			<div><dt>Queued</dt><dd>{duration(turn.queuedMs)}</dd></div>
 			<div><dt>Duration</dt><dd>{duration(turn.durationMs)}</dd></div>
 			<div><dt>Tokens in</dt><dd>{turn.tokens.input.toLocaleString()} <span class="muted">({turn.tokens.cached.toLocaleString()} cached)</span></dd></div>

@@ -4,15 +4,16 @@
 	import { goto } from '$app/navigation';
 	import { targetHref, taskHref } from '#lib/format.ts';
 	import { taskStageMeta } from '#lib/meta.ts';
-	import { api } from '#lib/mock/api.ts';
+	import { api } from '#lib/api/index.ts';
+	import { withBase } from '#lib/paths.ts';
 	import { ui } from '#lib/state/ui.svelte.ts';
 
 	const pages = [
-		{ href: '/', label: 'Overview', icon: LayoutDashboard },
-		{ href: '/me/credentials', label: 'My credentials', icon: KeyRound },
-		{ href: '/me/sponsorships', label: 'My sponsorships', icon: HandCoins },
-		{ href: '/admin', label: 'Operator', icon: ServerCog },
-		{ href: '/styleguide', label: 'Styleguide', icon: Palette }
+		{ href: withBase('/'), label: 'Overview', icon: LayoutDashboard },
+		{ href: withBase('/me/credentials'), label: 'My credentials', icon: KeyRound },
+		{ href: withBase('/me/sponsorships'), label: 'My sponsorships', icon: HandCoins },
+		{ href: withBase('/admin'), label: 'Operator', icon: ServerCog },
+		{ href: withBase('/styleguide'), label: 'Styleguide', icon: Palette }
 	];
 	const index = $derived(ui.paletteOpen ? api.index() : { targets: [], tasks: [] });
 

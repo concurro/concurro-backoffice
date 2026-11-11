@@ -2,11 +2,17 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { Check, HandCoins, KeyRound, LogOut, Monitor, Moon, Sun } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import { ME, users } from '#lib/mock/reference.ts';
+	import { actions, session } from '#lib/api/index.ts';
+	import { withBase } from '#lib/paths.ts';
 	import { theme, type ThemePref } from '#lib/state/theme.svelte.ts';
 	import Avatar from './Avatar.svelte';
 
-	const me = users.find((u) => u.login === ME)!;
+	const me = $derived(session.me);
+
+	async function signOut() {
+		await actions.signOut();
+		goto(withBase('/signin'));
+	}
 	const themes = [
 		{ value: 'light', label: 'Light', icon: Sun },
 		{ value: 'dark', label: 'Dark', icon: Moon },
@@ -22,7 +28,7 @@
 		<DropdownMenu.Content class="user-menu" align="end" sideOffset={6}>
 			<div class="menu-id">
 				<strong>{me.name}</strong>
-				<span>@{me.login} · writer</span>
+				<span>@{me.login}</span>
 			</div>
 			<DropdownMenu.Separator class="menu-sep" />
 			<DropdownMenu.Group>
@@ -40,10 +46,10 @@
 				</DropdownMenu.RadioGroup>
 			</DropdownMenu.Group>
 			<DropdownMenu.Separator class="menu-sep" />
-			<DropdownMenu.Item class="menu-item" onSelect={() => goto('/me/credentials')}><KeyRound size={14} aria-hidden="true" /><span>My credentials</span></DropdownMenu.Item>
-			<DropdownMenu.Item class="menu-item" onSelect={() => goto('/me/sponsorships')}><HandCoins size={14} aria-hidden="true" /><span>My sponsorships</span></DropdownMenu.Item>
+			<DropdownMenu.Item class="menu-item" onSelect={() => goto(withBase('/me/credentials'))}><KeyRound size={14} aria-hidden="true" /><span>My credentials</span></DropdownMenu.Item>
+			<DropdownMenu.Item class="menu-item" onSelect={() => goto(withBase('/me/sponsorships'))}><HandCoins size={14} aria-hidden="true" /><span>My sponsorships</span></DropdownMenu.Item>
 			<DropdownMenu.Separator class="menu-sep" />
-			<DropdownMenu.Item class="menu-item" onSelect={() => goto('/signin')}><LogOut size={14} aria-hidden="true" /><span>Sign out</span></DropdownMenu.Item>
+			<DropdownMenu.Item class="menu-item" onSelect={signOut}><LogOut size={14} aria-hidden="true" /><span>Sign out</span></DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Portal>
 </DropdownMenu.Root>

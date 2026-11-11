@@ -11,7 +11,8 @@
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { MERGED_STAGES, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
-	import { needsYou } from '#lib/mock/api.ts';
+	import { needsYou } from '#lib/needs-you.ts';
+	import { withBase } from '#lib/paths.ts';
 	import type { PageProps } from './$types';
 	import type { NeedsYouItem, Stage, Target, Task, Tone } from '#lib/types.ts';
 
@@ -34,7 +35,7 @@
 	const needMeta: Record<NeedsYouItem['kind'], { label: string; icon: IconType; tone: Tone; action: string; href?: string }> = {
 		plan_approval: { label: 'Plan approval', icon: FileCheck, tone: 'accent', action: 'Review plan' },
 		input_needed: { label: 'Input needed', icon: MessageCircleQuestionMark, tone: 'warning', action: 'Answer' },
-		credentials: { label: 'Credentials', icon: KeyRound, tone: 'danger', action: 'Fix credentials', href: '/me/credentials' },
+		credentials: { label: 'Credentials', icon: KeyRound, tone: 'danger', action: 'Fix credentials', href: withBase('/me/credentials') },
 		ci_red: { label: 'CI failing', icon: CircleX, tone: 'danger', action: 'Open task' }
 	};
 

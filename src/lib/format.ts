@@ -1,3 +1,5 @@
+import { withBase } from './paths.ts';
+
 export function relTime(iso: string): string {
 	const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
 	if (s < 60) return 'just now';
@@ -25,8 +27,9 @@ export function tokens(n: number): string {
 
 export const bytes = (s: string) => new TextEncoder().encode(s).length;
 
-export const taskHref = (t: { owner: string; repo: string; issue: number }) => `/tasks/${t.owner}/${t.repo}/${t.issue}`;
-export const targetHref = (t: { owner: string; repo: string }) => `/targets/${t.owner}/${t.repo}`;
+/** Links under the base path. */
+export const taskHref = (t: { owner: string; repo: string; issue: number }) => withBase(`/tasks/${t.owner}/${t.repo}/${t.issue}`);
+export const targetHref = (t: { owner: string; repo: string }) => withBase(`/targets/${t.owner}/${t.repo}`);
 
 export interface DiffLine {
 	kind: 'ctx' | 'add' | 'del' | 'hunk' | 'file';

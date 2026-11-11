@@ -12,6 +12,7 @@
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import TaskSignals from '#lib/components/TaskSignals.svelte';
 	import { relTime, taskHref } from '#lib/format.ts';
+	import { withBase } from '#lib/paths.ts';
 	import { taskStageMeta } from '#lib/meta.ts';
 	import type { Stage, Task } from '#lib/types.ts';
 	import type { PageProps } from './$types';
@@ -33,7 +34,7 @@
 	{#if paused.length}
 		<Alert tone="caution" title="{paused.length} sponsored {paused.length === 1 ? 'task is' : 'tasks are'} paused in awaiting_credentials">
 			Work resumes after you fix the credential and run <code>/concurro resume</code> on the task.
-			{#snippet actions()}<Button size="sm" href="/me/credentials">Open credentials</Button>{/snippet}
+			{#snippet actions()}<Button size="sm" href={withBase('/me/credentials')}>Open credentials</Button>{/snippet}
 		</Alert>
 	{/if}
 	<Panel flush title="Sponsored tasks" meta={String(tasks.length)}>

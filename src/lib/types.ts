@@ -53,6 +53,10 @@ export interface Target {
 	defaultBranch: string;
 	roster: RosterEntry[];
 	config: string;
+	/** Model profiles the roster refers to, from the target configuration. */
+	profiles?: ModelProfile[];
+	/** Whether the signed-in user can push to the target (and so run commands). */
+	writer?: boolean;
 }
 
 export interface Budget {
@@ -206,6 +210,8 @@ export interface RunJob {
 }
 
 export interface Turn {
+	/** Exchange turn ID (live data only). */
+	id?: string;
 	n: number;
 	stage: Stage;
 	role: Role;

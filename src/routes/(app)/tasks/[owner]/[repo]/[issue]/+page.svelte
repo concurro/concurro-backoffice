@@ -20,11 +20,12 @@
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { ciMeta, taskStageMeta } from '#lib/meta.ts';
-	import { ME, users } from '#lib/mock/reference.ts';
+	import { session } from '#lib/api/index.ts';
+	import { withBase } from '#lib/paths.ts';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
-	const name = (login: string) => users.find((u) => u.login === login)?.name ?? login;
+	const name = (login: string) => (login === session.me.login ? session.me.name : login);
 </script>
 
 <svelte:head><title>{params.repo}#{params.issue} · Concurro</title></svelte:head>
@@ -71,7 +72,7 @@
 		<Inline text={task.alert.body} />
 		{#if task.question}<blockquote>{task.question}</blockquote>{/if}
 		{#snippet actions()}
-			{#if task.paused}<Button size="sm" href="/me/credentials">Fix credentials</Button>{/if}
+			{#if task.paused}<Button size="sm" href={withBase('/me/credentials')}>Fix credentials</Button>{/if}
 		{/snippet}
 	</Alert>
 
@@ -96,7 +97,7 @@
 					<div class="sponsor">
 						<Avatar login={task.sponsor} size={32} />
 						<div>
-							<p class="sponsor-name">{name(task.sponsor)}{#if task.sponsor === ME}<span class="you">you</span>{/if}</p>
+							<p class="sponsor-name">{name(task.sponsor)}{#if task.sponsor === session.me.login}<span class="you">you</span>{/if}</p>
 							<p class="muted">@{task.sponsor} pays for this task’s model calls</p>
 						</div>
 					</div>

@@ -2,8 +2,8 @@
 	import { CircleCheck, HandCoins, Play, RotateCcw, Square, StepForward, Trash2 } from 'lucide-svelte';
 	import { bytes } from '#lib/format.ts';
 	import { isMerged, MERGED_STAGES, type IconType } from '#lib/meta.ts';
-	import { ME } from '#lib/mock/reference.ts';
-	import { runCommand } from '#lib/state/store.svelte.ts';
+	import { actions, MOCK, session } from '#lib/api/index.ts';
+	import { invalidateAll } from '$app/navigation';
 	import { toast } from '#lib/state/toast.svelte.ts';
 	import type { Command, Stage, Task } from '#lib/types.ts';
 	import Alert from '../Alert.svelte';
@@ -32,7 +32,7 @@
 		{ command: 'retry', label: 'Retry', icon: RotateCcw, enabled: ['blocked', 'escalated'].includes(task.stage) || task.pr?.ci === 'failing', why: 'Nothing has failed', title: 'Retry the last stage?', body: 'The last stage runs again. Design approvals are preserved. You can give the agent feedback.', confirm: 'Retry' },
 		{ command: 'resume', label: 'Resume', icon: StepForward, enabled: !!task.paused || ['stopped', 'blocked'].includes(task.stage), why: 'The task is not paused or stopped', title: 'Resume this task?', body: 'The task adopts current settings and instructions and continues from where it stopped. Completed work, approvals and spent budgets are preserved.', confirm: 'Resume' },
 		{ command: 'stop', label: 'Stop', icon: Square, enabled: !TERMINAL.includes(task.stage), why: 'The task is not running', title: 'Stop this task?', body: 'Running turns are cancelled and no new turns start. You can resume later.', confirm: 'Stop task' },
-		{ command: 'sponsor', label: 'Sponsor', icon: HandCoins, enabled: task.sponsor !== ME && !TERMINAL.includes(task.stage), why: task.sponsor === ME ? 'You already sponsor this task' : 'The task is finished', title: 'Sponsor this task?', body: `Model calls for this task will be paid with your provider credentials${task.sponsor ? `, replacing @${task.sponsor}` : ''}. The task pauses if a required credential is missing.`, confirm: 'Sponsor task' },
+		{ command: 'sponsor', label: 'Sponsor', icon: HandCoins, enabled: MOCK && task.sponsor !== session.me.login && !TERMINAL.includes(task.stage), why: !MOCK ? 'Sponsorship isn’t available yet' : task.sponsor === session.me.login ? 'You already sponsor this task' : 'The task is finished', title: 'Sponsor this task?', body: `Model calls for this task will be paid with your provider credentials${task.sponsor ? `, replacing @${task.sponsor}` : ''}. The task pauses if a required credential is missing.`, confirm: 'Sponsor task' },
 		{ command: 'invalidate', label: 'Invalidate', icon: Trash2, enabled: !isMerged(task.stage) && task.stage !== 'closed', why: 'The task is finished', title: 'Invalidate this task?', body: '', confirm: 'Invalidate task' }
 	]);
 
@@ -51,10 +51,21 @@
 		open = true;
 	}
 
-	function confirm() {
-		if (!pending) return;
-		toast(runCommand(task, pending, arg), pending === 'invalidate' || pending === 'stop' ? 'warning' : 'success');
-		open = false;
+	let busy = $state(false);
+
+	async function confirm() {
+		if (!pending || busy) return;
+		busy = true;
+		try {
+			const text = await actions.command(task, pending, arg);
+			toast(text, pending === 'invalidate' || pending === 'stop' ? 'warning' : 'success');
+			open = false;
+			if (!MOCK) await invalidateAll();
+		} catch (error) {
+			toast(error instanceof Error ? error.message : 'The command could not be posted.', 'danger');
+		} finally {
+			busy = false;
+		}
 	}
 </script>
 
@@ -83,7 +94,7 @@
 			<dt>Summary</dt><dd>{plan.summary}</dd>
 			<dt>Budget left</dt><dd class="num">{task.budgets.modelCalls.max - task.budgets.modelCalls.used} model calls</dd>
 		</dl>
-	{:else if pending === 'retry'}
+	{:else if pending === 'retry' && MOCK}
 		<label class="field">
 			<span>Feedback for the agent <span class="muted">(optional)</span></span>
 			<textarea rows="5" bind:value={feedback} aria-invalid={over} aria-describedby="fb-count" placeholder="What should the agent do differently?"></textarea>
@@ -93,7 +104,7 @@
 	<p class="posts">Posts <code>{comment}</code> as your comment on the issue.</p>
 	{#snippet footer()}
 		<Button onclick={() => (open = false)}>Cancel</Button>
-		<Button variant={pending === 'invalidate' ? 'danger-solid' : 'primary'} disabled={over} onclick={confirm}>{spec?.confirm}</Button>
+		<Button variant={pending === 'invalidate' ? 'danger-solid' : 'primary'} disabled={over || busy} onclick={confirm}>{spec?.confirm}</Button>
 	{/snippet}
 </Modal>
 
