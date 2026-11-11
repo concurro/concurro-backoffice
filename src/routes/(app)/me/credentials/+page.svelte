@@ -12,8 +12,8 @@
 	import UsageChart from '#lib/components/UsageChart.svelte';
 	import { relTime } from '#lib/format.ts';
 	import { credentialMeta, roleLabel } from '#lib/meta.ts';
-	import { profile, profiles } from '#lib/mock/reference.ts';
-	import { revokeCredential, saveCredential } from '#lib/state/store.svelte.ts';
+	import { invalidateAll } from '$app/navigation';
+	import { actions, MOCK, profile, session } from '#lib/api/index.ts';
 	import { toast } from '#lib/state/toast.svelte.ts';
 	import type { CredentialRoute, Provider, Role, Target } from '#lib/types.ts';
 	import type { PageProps } from './$types';
@@ -36,19 +36,30 @@
 	async function save() {
 		if (!editing) return;
 		validating = true;
-		await new Promise((r) => setTimeout(r, 900));
-		validating = false;
-		saveCredential(editing.id, secret);
-		secret = '';
-		editOpen = false;
-		toast(`${editing.label} validated and saved`);
+		try {
+			if (MOCK) await new Promise((r) => setTimeout(r, 900));
+			await actions.saveCredential(editing.id, secret);
+			secret = '';
+			editOpen = false;
+			toast(`${editing.label} validated and saved`);
+			if (!MOCK) await invalidateAll();
+		} catch (error) {
+			toast(error instanceof Error ? error.message : 'The credential could not be saved.', 'danger');
+		} finally {
+			validating = false;
+		}
 	}
 
-	function revoke() {
+	async function revoke() {
 		if (!revoking) return;
-		revokeCredential(revoking.id);
-		revokeOpen = false;
-		toast(`${revoking.label} revoked`, 'warning');
+		try {
+			await actions.revokeCredential(revoking.id);
+			revokeOpen = false;
+			toast(`${revoking.label} revoked`, 'warning');
+			if (!MOCK) await invalidateAll();
+		} catch (error) {
+			toast(error instanceof Error ? error.message : 'The credential could not be revoked.', 'danger');
+		}
 	}
 
 	const roles = Object.keys(roleLabel) as Role[];
@@ -117,7 +128,7 @@
 	</Panel>
 
 	<Panel title="Usage" meta="by task and model">
-		<UsageChart rows={usage} profiles={profiles.map((p) => p.name)} />
+		<UsageChart rows={usage} profiles={Object.keys(session.profiles)} />
 	</Panel>
 {:catch error}
 	<ErrorState {error} />

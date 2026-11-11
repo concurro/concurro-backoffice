@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { HandCoins, KeyRound, LayoutDashboard, Palette, PanelLeft, ServerCog, Target as TargetIcon } from 'lucide-svelte';
 	import { page } from '$app/state';
-	import { targetHref } from '#lib/format.ts';
 	import type { IconType } from '#lib/meta.ts';
-	import { targets } from '#lib/mock/reference.ts';
+	import { session } from '#lib/api/index.ts';
+	import { appPath, withBase } from '#lib/paths.ts';
 	import { toggleSidebar, ui } from '#lib/state/ui.svelte.ts';
 
 	interface Item {
@@ -14,14 +14,14 @@
 	}
 	const i = (href: string, label: string, icon: IconType, mono = false): Item => ({ href, label, icon, mono });
 
-	const groups: { label?: string; items: Item[] }[] = [
+	const groups = $derived<{ label?: string; items: Item[] }[]>([
 		{ items: [i('/', 'Overview', LayoutDashboard)] },
-		{ label: 'Targets', items: targets.map((t) => i(targetHref(t), `${t.owner}/${t.repo}`, TargetIcon, true)) },
+		{ label: 'Targets', items: session.targets.map((t) => i(`/targets/${t.owner}/${t.repo}`, `${t.owner}/${t.repo}`, TargetIcon, true)) },
 		{ label: 'Me', items: [i('/me/credentials', 'My credentials', KeyRound), i('/me/sponsorships', 'My sponsorships', HandCoins)] },
 		{ label: 'Admin', items: [i('/admin', 'Operator', ServerCog), i('/styleguide', 'Styleguide', Palette)] }
-	];
+	]);
 
-	const path = $derived(page.url.pathname);
+	const path = $derived(appPath(page.url.pathname));
 	function active(href: string): boolean {
 		if (href === '/') return path === '/';
 		// A task belongs to its target's nav entry.
@@ -30,7 +30,7 @@
 </script>
 
 <nav class="sidebar" class:collapsed={ui.sidebarCollapsed} class:open={ui.mobileNavOpen} aria-label="Primary">
-	<a class="brand" href="/" aria-label="Concurro overview">
+	<a class="brand" href={withBase('/')} aria-label="Concurro overview">
 		<span class="logo" aria-hidden="true">
 			<svg viewBox="0 0 24 24" width="22" height="22"><rect width="24" height="24" rx="6" fill="var(--accent)" /><path d="M15.5 8.5a5 5 0 1 0 0 7" fill="none" stroke="var(--on-accent)" stroke-width="2.2" stroke-linecap="round" /></svg>
 		</span>
@@ -43,7 +43,7 @@
 				{#if group.label}<p class="heading">{group.label}</p>{/if}
 				{#each group.items as item}
 					{@const Icon = item.icon}
-					<a href={item.href} class="item" class:active={active(item.href)} aria-current={active(item.href) ? 'page' : undefined} title={ui.sidebarCollapsed ? item.label : undefined} onclick={() => (ui.mobileNavOpen = false)}>
+					<a href={withBase(item.href)} class="item" class:active={active(item.href)} aria-current={active(item.href) ? 'page' : undefined} title={ui.sidebarCollapsed ? item.label : undefined} onclick={() => (ui.mobileNavOpen = false)}>
 						<Icon size={16} aria-hidden="true" />
 						<span class="label" class:mono={item.mono}>{item.label}</span>
 					</a>

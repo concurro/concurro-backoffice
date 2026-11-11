@@ -9,12 +9,13 @@
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { duration, tokens } from '#lib/format.ts';
 	import { outcomeMeta, roleLabel, stageMeta } from '#lib/meta.ts';
+	import { withBase } from '#lib/paths.ts';
 	import type { Role, Turn } from '#lib/types.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, params, children }: LayoutProps = $props();
 
-	const base = $derived(`/tasks/${params.owner}/${params.repo}/${params.issue}`);
+	const base = $derived(withBase(`/tasks/${params.owner}/${params.repo}/${params.issue}`));
 	const current = $derived(Number(page.params.turn));
 
 	let only = $state<'all' | 'problems'>('all');

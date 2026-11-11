@@ -1,4 +1,4 @@
-import { api } from '#lib/mock/api.ts';
+import { api } from '#lib/api/index.ts';
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = ({ params }) => ({

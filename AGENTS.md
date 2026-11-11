@@ -8,7 +8,10 @@
   must match the Concurro engine (`engine/vocab.py`, `engine/markup.py`,
   `bundle/schemas/*.json` in [concurro](https://github.com/concurro/concurro)). Check
   there before adding or renaming a status.
-- **Data:** the app runs on mock data. Route `load` functions use `src/lib/mock/api.ts`;
-  new code should go through it rather than importing fixtures directly.
+- **Data:** everything goes through `src/lib/api/` (`api` for loads, `actions` for writes), which
+  uses the backoffice API or, with `VITE_CONCURRO_DATA=mock`, the fixtures. Response shapes match
+  `src/lib/types.ts`; keep both modes working.
+- **Links:** the app is served under a base path; build links with `taskHref`, `targetHref` or
+  `withBase`, never a bare `/path`.
 - **Checks:** run `npm run check` and `npm run build` before proposing changes. Verify
   visual changes in light and dark mode.

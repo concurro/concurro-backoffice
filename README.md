@@ -5,20 +5,28 @@ provider credentials, a helicopter view of targets, issues and pull requests, ta
 and run diagnostics. The planned API surface is in Concurro's
 [backoffice API proposal](https://github.com/concurro/concurro/blob/main/docs/proposals/backoffice-api.md).
 
-**Status: mockup.** It runs on mock data only: there is no backend and no GitHub calls.
-Commands and credential changes update in-browser state and show a toast; a reload resets
-everything. Route `load` functions go through `src/lib/mock/api.ts`, but some components,
-pages and `src/lib/state/store.svelte.ts` still import fixtures from `src/lib/mock/`
-directly (current user, targets, command state); a real API client has to replace both.
+It talks to the backoffice API in [`concurro/backoffice`](https://github.com/concurro/concurro/tree/main/backoffice),
+which serves it at `https://<host>/concurro/`. With `VITE_CONCURRO_DATA=mock` it runs on the original
+in-browser fixtures instead, with no backend (commands and credential changes stay local; a reload
+resets them).
+
+All data goes through `src/lib/api/` (`live.ts` or `mock.ts`, chosen in `mode.ts`); only the
+styleguide reads fixtures directly. Links go through `taskHref`/`targetHref` or `withBase` (`src/lib/paths.ts`),
+because the app is served under the `/concurro` base path.
 
 ## Run
 
 ```bash
 npm install
-npm run dev
+npm run dev:mock   # fixtures, no backend
+npm run dev        # proxies /concurro/api and /concurro/auth to the backoffice API
 ```
 
-`npm run check` type-checks the project and `npm run build` produces a static build.
+`npm run dev` expects the backoffice API at `http://127.0.0.1:8788` (override with `CONCURRO_API`).
+The app is served under `/concurro`; `CONCURRO_BASE=` serves it at the root.
+
+`npm run check` type-checks the project. `npm run build` produces the static build the backoffice
+serves (`static_dir` in its settings); `npm run build:mock` builds the fixture version.
 
 ## Screens
 
@@ -50,6 +58,7 @@ issue number, e.g. `/tasks/example-org/ledger-core/1`, shows the error state.
 | `src/lib/styles/base.css` | Reset, element defaults and tone utilities |
 | `src/lib/types.ts` | Domain types |
 | `src/lib/meta.ts` | Label, tone and icon for every status |
+| `src/lib/api/` | Data access: the API client (`live.ts`), the fixture adapter (`mock.ts`) and session state |
 | `src/lib/mock/` | Fixtures and `api.ts`, which serves them with an artificial delay |
 | `src/lib/state/` | Mock store, theme, toasts and shell state |
 | `src/lib/components/` | Shared components; `task/` holds the task detail panels |
