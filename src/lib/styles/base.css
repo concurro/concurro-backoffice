@@ -1,0 +1,161 @@
+/* Reset and element defaults. Component styling lives in the components. */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	font-size: 16px;
+	-webkit-text-size-adjust: 100%;
+}
+
+body,
+[data-theme] {
+	color: var(--text);
+	background: var(--bg);
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--fs-md);
+	line-height: var(--lh-normal);
+	font-feature-settings: 'cv11', 'ss03';
+	-webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+	margin: 0;
+}
+
+h1 {
+	font-size: var(--fs-xl);
+	font-weight: var(--fw-semibold);
+	line-height: var(--lh-tight);
+	letter-spacing: -0.01em;
+}
+
+h2 {
+	font-size: var(--fs-md);
+	font-weight: var(--fw-semibold);
+}
+
+h3 {
+	font-size: var(--fs-sm);
+	font-weight: var(--fw-semibold);
+}
+
+a {
+	color: var(--accent-text);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+code,
+kbd,
+pre,
+.mono {
+	font-family: var(--font-mono);
+	font-size: 0.92em;
+	font-variant-ligatures: none;
+}
+
+kbd {
+	padding: 1px 5px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--r-sm);
+	background: var(--surface-2);
+	color: var(--text-2);
+	font-size: var(--fs-2xs);
+}
+
+.num {
+	font-variant-numeric: tabular-nums;
+}
+
+.muted {
+	color: var(--text-3);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus-ring);
+	outline-offset: 2px;
+	border-radius: var(--r-sm);
+}
+
+::selection {
+	background: var(--accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+/* Tone utilities: map a semantic tone onto four local variables. */
+.tone-neutral {
+	--tone-fg: var(--neutral-fg);
+	--tone-bg: var(--neutral-bg);
+	--tone-border: var(--neutral-border);
+	--tone-solid: var(--neutral-solid);
+}
+.tone-info {
+	--tone-fg: var(--info-fg);
+	--tone-bg: var(--info-bg);
+	--tone-border: var(--info-border);
+	--tone-solid: var(--info-solid);
+}
+.tone-success {
+	--tone-fg: var(--success-fg);
+	--tone-bg: var(--success-bg);
+	--tone-border: var(--success-border);
+	--tone-solid: var(--success-solid);
+}
+.tone-warning {
+	--tone-fg: var(--warning-fg);
+	--tone-bg: var(--warning-bg);
+	--tone-border: var(--warning-border);
+	--tone-solid: var(--warning-solid);
+}
+.tone-danger {
+	--tone-fg: var(--danger-fg);
+	--tone-bg: var(--danger-bg);
+	--tone-border: var(--danger-border);
+	--tone-solid: var(--danger-solid);
+}
+.tone-accent {
+	--tone-fg: var(--accent-text);
+	--tone-bg: var(--accent-soft);
+	--tone-border: var(--info-border);
+	--tone-solid: var(--accent);
+}
