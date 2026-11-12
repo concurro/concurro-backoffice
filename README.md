@@ -5,8 +5,8 @@ provider credentials, a helicopter view of targets, issues and pull requests, ta
 and run diagnostics. The planned API surface is in Concurro's
 [backoffice API proposal](https://github.com/concurro/concurro/blob/main/docs/proposals/backoffice-api.md).
 
-It talks to the backoffice API in [`concurro/backoffice`](https://github.com/concurro/concurro/tree/main/backoffice),
-which serves it at `https://<host>/concurro/`. With `VITE_CONCURRO_DATA=mock` it runs on the original
+It talks to the backoffice API in [`concurro/backoffice`](https://github.com/concurro/concurro/tree/main/backoffice)
+and is served beside it at `https://<host>/concurro/`. With `VITE_CONCURRO_DATA=mock` it runs on the original
 in-browser fixtures instead, with no backend (commands and credential changes stay local; a reload
 resets them).
 
@@ -29,8 +29,15 @@ npm run dev        # proxies /concurro/api and /concurro/auth to the backoffice 
 `npm run dev` expects the backoffice API at `http://127.0.0.1:8788` (override with `CONCURRO_API`).
 The app is served under `/concurro`; `CONCURRO_BASE=` serves it at the root.
 
-`npm run check` type-checks the project. `npm run build` produces the static build the backoffice
-serves (`static_dir` in its settings); `npm run build:mock` builds the fixture version.
+`npm run check` type-checks the project. `npm run build` produces the static build;
+`npm run build:mock` builds the fixture version.
+
+## Release
+
+CI type-checks and builds the [image](Dockerfile) (the static build behind Caddy on port 8080) and
+publishes it for every `main` commit as `ghcr.io/concurro/backoffice-web:<commit SHA>`. Deploy a
+commit with `bash deploy/deploy.sh web FULL_COMMIT_SHA` from
+[concurro](https://github.com/concurro/concurro/blob/main/gateway/README.md#releases).
 
 ## Screens
 
