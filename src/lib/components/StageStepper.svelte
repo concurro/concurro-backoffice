@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { Check } from 'lucide-svelte';
-	import { isMerged, mergedEarly, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
+	import { isMerged, mergedEarly, stepHasRecord, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
 	import type { Task } from '#lib/types.ts';
 
-	let { task }: { task: Task } = $props();
+	/** `selected` is the step whose details the page shows; `onselect` picks another. */
+	let { task, selected, onselect }: { task: Task; selected?: number; onselect?: (step: number) => void } = $props();
 
 	const parked = $derived(task.stage !== task.atStage || !!task.paused);
 	const done = $derived((isMerged(task.stage) && !mergedEarly(task)) || (task.stage === 'gates' && task.pr?.ready));
@@ -11,26 +12,27 @@
 	const meta = $derived(taskStageMeta(task));
 	const ParkedIcon = $derived(meta.icon);
 
-	function state(i: number): 'done' | 'current' | 'parked' | 'todo' {
+	function state(i: number): 'done' | 'current' | 'parked' | 'rerun' | 'todo' {
 		if (i < current || (i === current && done)) return 'done';
 		if (i === current) return parked ? 'parked' : 'current';
-		return 'todo';
+		return stepHasRecord(task, i) ? 'rerun' : 'todo';
 	}
+	const words = { done: 'Done', rerun: 'Rerun pending', todo: 'Not started' };
 </script>
 
 <ol class="stepper" aria-label="Task progress">
 	{#each steps as step, i}
 		{@const s = state(i)}
-		<li class="{s} {s === 'parked' ? `tone-${meta.tone}` : ''}" aria-current={i === current ? 'step' : undefined}>
-			<span class="marker" aria-hidden="true">
-				{#if s === 'done'}<Check size={12} strokeWidth={3} />{:else if s === 'parked'}<ParkedIcon size={12} strokeWidth={2.5} />{:else}{i + 1}{/if}
-			</span>
-			<span class="text">
-				<span class="label">{step.label}</span>
-				<span class="state">
-					{#if s === 'done'}Done{:else if s === 'current' || s === 'parked'}{meta.label}{:else}Not started{/if}
+		<li class="{s} {s === 'parked' ? `tone-${meta.tone}` : ''}" class:selected={i === selected} aria-current={i === current ? 'step' : undefined}>
+			<button type="button" aria-pressed={onselect ? i === selected : undefined} disabled={!onselect} onclick={() => onselect?.(i)}>
+				<span class="marker" aria-hidden="true">
+					{#if s === 'done'}<Check size={12} strokeWidth={3} />{:else if s === 'parked'}<ParkedIcon size={12} strokeWidth={2.5} />{:else}{i + 1}{/if}
 				</span>
-			</span>
+				<span class="text">
+					<span class="label">{step.label}</span>
+					<span class="state">{s === 'current' || s === 'parked' ? meta.label : words[s]}</span>
+				</span>
+			</button>
 		</li>
 	{/each}
 </ol>
@@ -49,12 +51,42 @@
 	}
 	li {
 		position: relative;
+		border-right: 1px solid var(--border);
+		min-width: 0;
+	}
+	button {
 		display: flex;
 		align-items: center;
 		gap: var(--s-2);
+		width: 100%;
+		height: 100%;
 		padding: var(--s-3);
-		border-right: 1px solid var(--border);
-		min-width: 0;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	button:disabled {
+		cursor: default;
+	}
+	button:enabled:hover {
+		background: color-mix(in srgb, var(--text) 5%, transparent);
+	}
+	button:focus-visible {
+		outline-offset: -2px;
+	}
+	/* The step whose details are shown: a rail along the top edge. */
+	li.selected::before {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 2px;
+		background: var(--text-2);
+	}
+	li.selected .label {
+		font-weight: var(--fw-semibold);
 	}
 	li:last-child {
 		border-right: 0;
@@ -122,8 +154,15 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.todo .label {
+	.todo .label,
+	.rerun .label {
 		color: var(--text-3);
+	}
+	.rerun .marker {
+		border-style: dashed;
+	}
+	.rerun .state {
+		font-style: italic;
 	}
 	.state {
 		color: var(--text-3);

@@ -15,17 +15,29 @@
 	import CommandBar from '#lib/components/task/CommandBar.svelte';
 	import CompletionPanel from '#lib/components/task/CompletionPanel.svelte';
 	import DesignReviewPanel from '#lib/components/task/DesignReviewPanel.svelte';
+	import ImplementPanel from '#lib/components/task/ImplementPanel.svelte';
+	import IntakePanel from '#lib/components/task/IntakePanel.svelte';
 	import PlanPanel from '#lib/components/task/PlanPanel.svelte';
 	import PrReviewPanel from '#lib/components/task/PrReviewPanel.svelte';
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
-	import { ciMeta, taskStageMeta } from '#lib/meta.ts';
+	import { ciMeta, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
 	import { session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
 	const name = (login: string) => (login === session.me.login ? session.me.name : login);
+
+	/** The step whose details are shown, from `?phase=`; defaults to where the task is. */
+	const picked = $derived(steps.findIndex((s) => s.key === page.url.searchParams.get('phase')));
+	function select(step: number) {
+		const url = new URL(page.url.href);
+		url.searchParams.set('phase', steps[step].key);
+		goto(url, { replace: true, reset: false });
+	}
 </script>
 
 <svelte:head><title>{params.repo}#{params.issue} · Concurro</title></svelte:head>
@@ -40,6 +52,7 @@
 	</div>
 {:then { task }}
 	{@const turns = `${taskHref(task)}/turns`}
+	{@const phase = picked >= 0 ? picked : Math.max(stepIndex(task.atStage), 0)}
 	<PageHeader title={task.title}>
 		{#snippet eyebrow()}
 			<a class="mono" href={targetHref(task)}>{task.owner}/{task.repo}</a>
@@ -56,7 +69,7 @@
 		{#if task.pr}
 			<span class="pr">
 				<GitPullRequest size={14} aria-hidden="true" />
-				<a href="#pr-review">#{task.pr.number}</a>
+				<a href="?phase=review">#{task.pr.number}</a>
 				<span class="mono muted">{task.pr.headSha}</span>
 				{#if task.pr.additions !== null && task.pr.deletions !== null}
 					<span class="num diffstat"><span class="add">+{task.pr.additions}</span> <span class="del">−{task.pr.deletions}</span></span>
@@ -68,7 +81,7 @@
 		<span class="muted updated">Updated {relTime(task.updatedAt)}</span>
 	</PageHeader>
 
-	<StageStepper {task} />
+	<StageStepper {task} selected={phase} onselect={select} />
 
 	<Alert tone={task.alert.tone} title={task.alert.title}>
 		<Inline text={task.alert.body} />
@@ -79,14 +92,23 @@
 	</Alert>
 
 	<div class="grid">
-		<div class="col">
-			<PlanPanel {task} />
-			<DesignReviewPanel {task} />
-			<PrReviewPanel {task} />
+		<div class="col" role="region" aria-label="{steps[phase].label} details">
+			{#if phase === 0}
+				<IntakePanel {task} />
+			{:else if phase === 1}
+				<PlanPanel {task} />
+			{:else if phase === 2}
+				<DesignReviewPanel {task} />
+			{:else if phase === 3}
+				<ImplementPanel {task} {turns} />
+			{:else if phase === 4}
+				<PrReviewPanel {task} />
+			{:else}
+				{#if task.completion}<CompletionPanel completion={task.completion} />{/if}
+				<ReadinessPanel {task} />
+			{/if}
 		</div>
 		<div class="col">
-			{#if task.completion}<CompletionPanel completion={task.completion} />{/if}
-			<ReadinessPanel {task} />
 			<Panel title="Budgets" id="budgets">
 				<div class="meters">
 					<Meter label="Model calls" {...task.budgets.modelCalls} />

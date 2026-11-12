@@ -75,7 +75,20 @@ export interface PlanVersion {
 /** Design-review decisions (`plan_qc` schema) and PR-review verdicts (`review` schema). */
 export type DesignDecision = 'approve' | 'revise' | 'clarify' | 'reject' | 'escalate';
 export type PrVerdict = 'approve' | 'changes_requested' | 'reopen';
-export type Verdict = DesignDecision | PrVerdict | 'pending';
+/** Triage decisions (intake `qc` schema). */
+export type IntakeDecision = 'proceed' | 'clarify' | 'reject' | 'escalate';
+export type Verdict = IntakeDecision | DesignDecision | PrVerdict | 'pending';
+
+/** One recorded triage assessment; only the current one carries its concerns. */
+export interface IntakeRound {
+	agent: string;
+	profile: string;
+	decision: IntakeDecision;
+	risk: string;
+	rationale: string;
+	concerns: string[];
+	at: string;
+}
 
 export interface Objection {
 	id: string;
@@ -177,6 +190,9 @@ export interface Task {
 	pauseReason?: string;
 	question?: string;
 	alert: TaskAlert;
+	/** The issue description (GitHub Markdown); only the task view loads it. */
+	body?: string;
+	intake: IntakeRound[];
 	pr?: PullRequest;
 	completion?: TaskCompletion;
 	plans: PlanVersion[];

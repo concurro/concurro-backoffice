@@ -91,6 +91,7 @@ export const ciMeta: Record<CiStatus, Meta> = {
 };
 
 export const verdictMeta: Record<Verdict, Meta> = {
+	proceed: m('Proceed', 'success', Check),
 	approve: m('Approve', 'success', Check),
 	changes_requested: m('Changes requested', 'warning', CircleAlert),
 	reopen: m('Reopen design', 'danger', RotateCcw),
@@ -143,16 +144,20 @@ export const mergedEarlyMeta = m('Merged early', 'warning', GitMerge);
 export const taskStageMeta = (task: Task): Meta => (mergedEarly(task) ? mergedEarlyMeta : stageMeta[task.stage]);
 
 /** Pipeline steps shown in the stage stepper, and which stages belong to each. */
-export const steps: { label: string; stages: Stage[] }[] = [
-	{ label: 'Intake', stages: ['intake', 'clarify'] },
-	{ label: 'Plan', stages: ['plan'] },
-	{ label: 'Design review', stages: ['plan_qc', 'planned'] },
-	{ label: 'Implement', stages: ['implement', 'publish'] },
-	{ label: 'PR review', stages: ['review'] },
-	{ label: 'Handoff', stages: ['gates', ...MERGED_STAGES] }
+export const steps: { key: string; label: string; stages: Stage[] }[] = [
+	{ key: 'intake', label: 'Intake', stages: ['intake', 'clarify'] },
+	{ key: 'plan', label: 'Plan', stages: ['plan'] },
+	{ key: 'design', label: 'Design review', stages: ['plan_qc', 'planned'] },
+	{ key: 'implement', label: 'Implement', stages: ['implement', 'publish'] },
+	{ key: 'review', label: 'PR review', stages: ['review'] },
+	{ key: 'handoff', label: 'Handoff', stages: ['gates', ...MERGED_STAGES] }
 ];
 
 export const stepIndex = (stage: Stage) => steps.findIndex((s) => s.stages.includes(stage));
+
+/** Whether a step has recorded work, e.g. from a run that a revision or reassessment later superseded. */
+export const stepHasRecord = (task: Task, i: number): boolean =>
+	[task.intake.length, task.plans.length, task.designReview.length, task.pr ? 1 : 0, task.rounds.length, 0][i] > 0;
 
 /** Fixed and obsolete findings are resolved; open and withdrawn ones block the merge whatever their severity. */
 export const isResolved = (status: FindingStatus) => status === 'fixed' || status === 'obsolete';
