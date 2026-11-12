@@ -11,6 +11,7 @@
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { MERGED_STAGES, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
+	import { session } from '#lib/api/index.ts';
 	import { needsYou } from '#lib/needs-you.ts';
 	import { withBase } from '#lib/paths.ts';
 	import type { PageProps } from './$types';
@@ -28,7 +29,7 @@
 			{ label: 'Active', value: count((t) => ACTIVE.includes(t.stage)), hint: 'Agents are working', icon: Activity, tone: 'info' },
 			{ label: 'Awaiting human', value: count((t) => t.stage === 'clarify' || t.stage === 'planned'), hint: 'Approval or input needed', icon: UserRoundCheck, tone: 'warning' },
 			{ label: 'Blocked', value: count((t) => t.stage === 'blocked' || t.stage === 'escalated'), hint: 'Paused or escalated', icon: OctagonAlert, tone: 'danger' },
-			{ label: 'Ready for merge', value: count((t) => t.stage === 'gates' && !!t.pr?.ready), hint: 'Handed off to maintainers', icon: GitPullRequestArrow, tone: 'success' }
+			{ label: 'Ready for merge', value: count((t) => t.stage === 'gates' && (t.pr?.ready ?? true)), hint: 'Handed off to maintainers', icon: GitPullRequestArrow, tone: 'success' }
 		] satisfies { label: string; value: number; hint: string; icon: IconType; tone: Tone }[];
 	}
 
@@ -146,7 +147,7 @@
 		</div>
 	</section>
 
-	<p class="sponsor-note muted"><Avatar login="mkeller" size={16} /> Signed in as mkeller. “Needs you” lists tasks you can approve, answer or sponsor.</p>
+	<p class="sponsor-note muted"><Avatar login={session.me.login} size={16} /> Signed in as {session.me.login}. “Needs you” lists tasks you can approve, answer or sponsor.</p>
 {:catch error}
 	<ErrorState {error} />
 {/await}
