@@ -10,6 +10,10 @@ which serves it at `https://<host>/concurro/`. With `VITE_CONCURRO_DATA=mock` it
 in-browser fixtures instead, with no backend (commands and credential changes stay local; a reload
 resets them).
 
+Retry can grant 1–999 extra plan revisions when the allowance is exhausted. Leaving the field
+empty posts an ordinary retry. A successful command response confirms that the comment was
+posted; the task processes it asynchronously.
+
 All data goes through `src/lib/api/` (`live.ts` or `mock.ts`, chosen in `mode.ts`); only the
 styleguide reads fixtures directly. Links go through `taskHref`/`targetHref` or `withBase` (`src/lib/paths.ts`),
 because the app is served under the `/concurro` base path.

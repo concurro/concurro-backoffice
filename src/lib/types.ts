@@ -127,8 +127,9 @@ export interface PullRequest {
 	branch: string;
 	headSha: string;
 	ci: CiStatus;
-	additions: number;
-	deletions: number;
+	/** Unknown (`null`) when GitHub only returned the plain pull request listing. */
+	additions: number | null;
+	deletions: number | null;
 	ready: boolean;
 }
 

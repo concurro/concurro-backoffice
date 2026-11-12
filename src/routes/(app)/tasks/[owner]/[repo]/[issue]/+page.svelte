@@ -58,7 +58,9 @@
 				<GitPullRequest size={14} aria-hidden="true" />
 				<a href="#pr-review">#{task.pr.number}</a>
 				<span class="mono muted">{task.pr.headSha}</span>
-				<span class="num diffstat"><span class="add">+{task.pr.additions}</span> <span class="del">−{task.pr.deletions}</span></span>
+				{#if task.pr.additions !== null && task.pr.deletions !== null}
+					<span class="num diffstat"><span class="add">+{task.pr.additions}</span> <span class="del">−{task.pr.deletions}</span></span>
+				{/if}
 			</span>
 			<Badge plain meta={ciMeta[task.pr.ci]} />
 		{/if}

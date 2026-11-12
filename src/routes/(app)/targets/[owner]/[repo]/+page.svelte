@@ -115,7 +115,7 @@
 									<td class="mono nowrap">{pr.headSha}</td>
 									<td><Badge meta={taskStageMeta(t)} /></td>
 									<td><TaskSignals task={t} /></td>
-									<td class="r nowrap mono"><span class="add">+{pr.additions}</span> <span class="del">−{pr.deletions}</span></td>
+									<td class="r nowrap mono">{#if pr.additions !== null && pr.deletions !== null}<span class="add">+{pr.additions}</span> <span class="del">−{pr.deletions}</span>{:else}<span class="muted" title="Line counts are unavailable">—</span>{/if}</td>
 									<td class="nowrap"><Badge plain tone={t.stage === 'merged' ? 'accent' : pr.ready ? 'success' : 'neutral'}>{t.stage === 'merged' ? 'Merged' : pr.ready ? 'Ready for review' : 'Draft'}</Badge></td>
 								</tr>
 							{/each}

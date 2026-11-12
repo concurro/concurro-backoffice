@@ -98,11 +98,11 @@ export const api = {
 };
 
 export const actions = {
-	/** Posts the `/concurro` command as the user's issue comment; returns toast text. */
+	/** Sends the command; Concurro posts it on the issue as the user's command. Returns toast text. */
 	async command(task: Task, command: Command, arg = ''): Promise<string> {
-		const argument = command === 'approve' ? arg || undefined : undefined;
-		const result = await request<{ posted: string }>('POST', `/api/tasks/${path(task.owner, task.repo, task.issue)}/commands`, { command, argument });
-		return `Posted ${result.posted} on ${task.repo}#${task.issue}`;
+		const argument = (command === 'approve' || command === 'retry') && arg ? arg : undefined;
+		const result = await request<{ posted: string; actor: string }>('POST', `/api/tasks/${path(task.owner, task.repo, task.issue)}/commands`, { command, argument });
+		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
 	async saveCredential(id: CredentialRouteId, secret: string): Promise<CredentialRoute> {
 		return request<CredentialRoute>('PUT', `/api/me/credentials/${id}`, { secret });

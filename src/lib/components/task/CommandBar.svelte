@@ -13,6 +13,7 @@
 	let { task }: { task: Task } = $props();
 
 	const FEEDBACK_MAX = 4000;
+	const REVISIONS_MAX = 999;
 	const TERMINAL: Stage[] = [...MERGED_STAGES, 'closed', 'rejected', 'stopped'];
 	const plan = $derived(task.plans.at(-1));
 
@@ -29,7 +30,7 @@
 	const specs = $derived<Spec[]>([
 		{ command: 'start', label: 'Start', icon: Play, enabled: task.stage === 'rejected' || task.stage === 'closed', why: 'The task has already started', title: 'Start this task?', body: 'Triage assesses the issue first. Starting spends model-call budget.', confirm: 'Start task' },
 		{ command: 'approve', label: 'Approve plan', icon: CircleCheck, enabled: task.stage === 'planned' && !!plan, why: 'No plan is waiting for approval', title: `Approve plan v${plan?.version ?? ''}?`, body: 'Implementation starts on the next free runner and follows this plan exactly. Later plan versions need a new approval.', confirm: 'Approve plan' },
-		{ command: 'retry', label: 'Retry', icon: RotateCcw, enabled: ['blocked', 'escalated'].includes(task.stage) || task.pr?.ci === 'failing', why: 'Nothing has failed', title: 'Retry the last stage?', body: 'The last stage runs again. Design approvals are preserved. You can give the agent feedback.', confirm: 'Retry' },
+		{ command: 'retry', label: 'Retry', icon: RotateCcw, enabled: ['blocked', 'escalated'].includes(task.stage) || task.pr?.ci === 'failing', why: 'Nothing has failed', title: 'Retry the last stage?', body: `The last stage runs again. Design approvals are preserved. ${MOCK ? 'You can give the agent feedback.' : 'You can grant extra plan revisions if the allowance ran out.'}`, confirm: 'Retry' },
 		{ command: 'resume', label: 'Resume', icon: StepForward, enabled: !!task.paused || ['stopped', 'blocked'].includes(task.stage), why: 'The task is not paused or stopped', title: 'Resume this task?', body: 'The task adopts current settings and instructions and continues from where it stopped. Completed work, approvals and spent budgets are preserved.', confirm: 'Resume' },
 		{ command: 'stop', label: 'Stop', icon: Square, enabled: !TERMINAL.includes(task.stage), why: 'The task is not running', title: 'Stop this task?', body: 'Running turns are cancelled and no new turns start. You can resume later.', confirm: 'Stop task' },
 		{ command: 'sponsor', label: 'Sponsor', icon: HandCoins, enabled: MOCK && task.sponsor !== session.me.login && !TERMINAL.includes(task.stage), why: !MOCK ? 'Sponsorship isn’t available yet' : task.sponsor === session.me.login ? 'You already sponsor this task' : 'The task is finished', title: 'Sponsor this task?', body: `Model calls for this task will be paid with your provider credentials${task.sponsor ? `, replacing @${task.sponsor}` : ''}. The task pauses if a required credential is missing.`, confirm: 'Sponsor task' },
@@ -39,15 +40,23 @@
 	let pending = $state<Command | null>(null);
 	let open = $state(false);
 	let feedback = $state('');
+	/** Extra plan revisions granted with a live retry (`/concurro retry --plan-revisions N`). */
+	let revisions = $state<number | null>(null);
 	const spec = $derived(specs.find((s) => s.command === pending));
 	const size = $derived(bytes(feedback));
 	const over = $derived(size > FEEDBACK_MAX);
-	const arg = $derived(pending === 'approve' ? (plan?.id ?? '') : pending === 'retry' ? feedback.trim() : '');
-	const comment = $derived(`/concurro ${pending}${pending === 'approve' ? ` ${arg}` : ''}`);
+	const badRevisions = $derived(revisions !== null && !(Number.isInteger(revisions) && revisions >= 1 && revisions <= REVISIONS_MAX));
+	const arg = $derived(
+		pending === 'approve' ? (plan?.id ?? '') : pending === 'retry' ? (MOCK ? feedback.trim() : revisions === null ? '' : String(revisions)) : ''
+	);
+	const comment = $derived(
+		`/concurro ${pending}${pending === 'approve' ? ` ${arg}` : pending === 'retry' && !MOCK && arg ? ` --plan-revisions ${arg}` : ''}`
+	);
 
 	function ask(command: Command) {
 		pending = command;
 		feedback = '';
+		revisions = null;
 		open = true;
 	}
 
@@ -100,11 +109,19 @@
 			<textarea rows="5" bind:value={feedback} aria-invalid={over} aria-describedby="fb-count" placeholder="What should the agent do differently?"></textarea>
 		</label>
 		<p id="fb-count" class="count num" class:over>{size.toLocaleString()} / {FEEDBACK_MAX.toLocaleString()} bytes{over ? ' — shorten the feedback to continue' : ''}</p>
+	{:else if pending === 'retry'}
+		<label class="field">
+			<span>Extra plan revisions <span class="muted">(optional)</span></span>
+			<input type="number" min="1" max={REVISIONS_MAX} step="1" bind:value={revisions} aria-invalid={badRevisions} aria-describedby="rev-hint" placeholder="None" />
+		</label>
+		<p id="rev-hint" class="count num" class:over={badRevisions}>
+			{#if badRevisions}Enter a whole number from 1 to {REVISIONS_MAX}.{:else}Plan revisions used: {task.budgets.planRevisions.used} of {task.budgets.planRevisions.max}. Grant more if planning stopped because they ran out.{/if}
+		</p>
 	{/if}
-	<p class="posts">Posts <code>{comment}</code> as your comment on the issue.</p>
+	<p class="posts">{#if MOCK}Applies <code>{comment}</code> to this demo.{:else}Concurro posts <code>{comment}</code> on your behalf. The task processes it asynchronously.{/if}</p>
 	{#snippet footer()}
 		<Button onclick={() => (open = false)}>Cancel</Button>
-		<Button variant={pending === 'invalidate' ? 'danger-solid' : 'primary'} disabled={over || busy} onclick={confirm}>{spec?.confirm}</Button>
+		<Button variant={pending === 'invalidate' ? 'danger-solid' : 'primary'} disabled={over || badRevisions || busy} onclick={confirm}>{spec?.confirm}</Button>
 	{/snippet}
 </Modal>
 
@@ -166,7 +183,8 @@
 	.field .muted {
 		font-weight: var(--fw-regular);
 	}
-	textarea {
+	textarea,
+	input {
 		width: 100%;
 		padding: var(--s-2);
 		border: 1px solid var(--border-strong);
@@ -176,7 +194,8 @@
 		font-weight: var(--fw-regular);
 		resize: vertical;
 	}
-	textarea[aria-invalid='true'] {
+	textarea[aria-invalid='true'],
+	input[aria-invalid='true'] {
 		border-color: var(--danger-solid);
 	}
 	.count {
