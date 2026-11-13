@@ -30,6 +30,10 @@
 			.filter((t) => !q || `${t.n} ${t.agent} ${t.profile} ${t.stage} ${t.outcome}`.toLowerCase().includes(q))
 			.reverse();
 	}
+	/** A total is unknown if any turn lacks the requested count. */
+	function tokenSum(turns: Turn[], key: 'input' | 'output'): number | null {
+		return turns.some((t) => t.tokens[key] === null) ? null : turns.reduce((total, t) => total + (t.tokens[key] ?? 0), 0);
+	}
 	const sum = (turns: Turn[], f: (t: Turn) => number) => turns.reduce((a, t) => a + f(t), 0);
 </script>
 
@@ -50,8 +54,8 @@
 	<dl class="stats num">
 		<div><dt>Turns</dt><dd>{turns.length}</dd></div>
 		<div><dt>Not ok</dt><dd>{turns.filter((t) => t.outcome !== 'ok').length}</dd></div>
-		<div><dt>Input tokens</dt><dd>{tokens(sum(turns, (t) => t.tokens.input))}</dd></div>
-		<div><dt>Output tokens</dt><dd>{tokens(sum(turns, (t) => t.tokens.output))}</dd></div>
+		<div><dt>Input tokens</dt><dd>{tokens(tokenSum(turns, 'input'))}</dd></div>
+		<div><dt>Output tokens</dt><dd>{tokens(tokenSum(turns, 'output'))}</dd></div>
 		<div><dt>Agent time</dt><dd>{duration(sum(turns, (t) => t.durationMs))}</dd></div>
 	</dl>
 	<div class="panes">
@@ -78,7 +82,7 @@
 								<span class="main">
 									<span class="top"><span class="mono agent">{t.agent}</span><Badge plain meta={outcomeMeta[t.outcome]} mono /></span>
 									<span class="sub num">
-										<span>{stageMeta[t.stage].label}</span><span class="mono">{t.profile}</span><span>{duration(t.durationMs)}</span><span>{tokens(t.tokens.input + t.tokens.output)} tok</span>
+										<span>{stageMeta[t.stage].label}</span><span class="mono">{t.profile}</span><span>{duration(t.durationMs)}</span><span>{t.tokens.input === null || t.tokens.output === null ? 'Usage unavailable' : `${tokens(t.tokens.input + t.tokens.output)} tok`}</span>
 									</span>
 								</span>
 							</a>

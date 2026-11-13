@@ -61,6 +61,14 @@ issue number, e.g. `/tasks/example-org/ledger-core/1`, shows the error state.
 
 `⌘K` opens the command palette. The user menu holds the theme toggle (light, dark, system).
 
+The Runner tab loads the selected turn's real Actions run attempts and jobs from the backoffice
+API. Deploy this nullable-aware web release before the API; run details remain unavailable
+until `/turns/{turn-id}/runs` is deployed. Historical
+dispatches are distinguished from confirmed runner assignments. Missing run history, job
+details, token counts and incomplete token totals display as unavailable; a successful turn
+does not imply that its shared workflow job has ended. Token metering awaits the provider
+sponsorship usage projection.
+
 ## Layout
 
 | Path | Contents |

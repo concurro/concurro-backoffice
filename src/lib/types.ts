@@ -226,6 +226,25 @@ export interface RunJob {
 	durationS: number;
 }
 
+/** GitHub's evidence for one session's workflow run attempt. */
+export interface TurnRun {
+	id: number;
+	attempt: number;
+	url: string;
+	workflow: string;
+	status: string;
+	conclusion: string | null;
+	session: string;
+	association: 'assigned' | 'dispatched';
+	jobs: { id: number; name: string; url: string; status: string; conclusion: string | null; durationS: number | null; runner: string | null; labels: string[] }[] | null;
+}
+
+/** Missing run history or a failed lookup is reported separately from an empty jobs list. */
+export interface TurnRuns {
+	runs: TurnRun[];
+	message: string | null;
+}
+
 export interface Turn {
 	/** Exchange turn ID (live data only). */
 	id?: string;
@@ -238,13 +257,13 @@ export interface Turn {
 	startedAt: string;
 	queuedMs: number;
 	durationMs: number;
-	tokens: { input: number; cached: number; output: number };
+	tokens: { input: number | null; cached: number | null; output: number | null };
 	run: {
-		id: number;
-		attempt: number;
-		workflow: string;
+		id: number | null;
+		attempt: number | null;
+		workflow: string | null;
 		runner: string;
-		jobs: RunJob[];
+		jobs: RunJob[] | null;
 		diagnosis?: { tone: AlertTone; title: string; body: string };
 	};
 	prompt: { instructions: string; snapshot: string; schema: string; untrusted: string };

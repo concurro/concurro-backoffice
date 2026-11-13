@@ -20,8 +20,9 @@ export function duration(ms: number): string {
 	return m < 60 ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
 }
 
-export function tokens(n: number): string {
-	if (!n) return '—';
+/** Format a reported count, distinguishing zero from missing usage. */
+export function tokens(n: number | null): string {
+    if (n === null) return 'Unavailable';
 	return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 

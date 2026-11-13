@@ -654,7 +654,8 @@ function build(task: Task, spec: Spec, n: number): Turn {
 		startedAt: ago(minutes),
 		queuedMs: outcome === 'queue_expired' ? 900_000 : 4_000 + ((n * 7919) % 41_000),
 		durationMs: durS * 1000,
-		tokens: {
+		// A historical turn without recorded usage exercises the unavailable state.
+		tokens: n === 23 ? { input: null, cached: null, output: null } : {
 			input,
 			cached: Math.round(input * 0.71),
 			output: ran ? Math.round((2_100 + n * 190) * (role === 'implementer' ? 4 : 1)) : 0

@@ -1,5 +1,5 @@
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -81,6 +81,9 @@ export const api = {
 			remember({ profiles: result.profiles });
 			return result;
 		}),
+	/** Load jobs only when the selected turn's Runner tab is opened. */
+	turnRuns: (owner: string, repo: string, issue: number, identifier: string) =>
+		request<TurnRuns>('GET', `/api/tasks/${path(owner, repo, issue)}/turns/${encodeURIComponent(identifier)}/runs`),
 	async credentials(): Promise<{ routes: CredentialRoute[]; targets: Target[]; usage: UsageRow[] }> {
 		const [result, overview] = await Promise.all([
 			request<{ routes: CredentialRoute[]; usage: UsageRow[] }>('GET', '/api/me/credentials'),
