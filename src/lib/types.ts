@@ -55,7 +55,7 @@ export interface Target {
 	config: string;
 	/** Model profiles the roster refers to, from the target configuration. */
 	profiles?: ModelProfile[];
-	/** Whether the signed-in user can push to the target (and so run commands). */
+	/** Whether the signed-in user has write access to the upstream repository. */
 	writer?: boolean;
 }
 

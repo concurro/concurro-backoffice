@@ -108,6 +108,7 @@ const base = [
 ];
 
 export const targets: Target[] = base.map(({ calls, ...t }) => ({
+	writer: users.find((u) => u.login === ME)!.writer,
 	...t,
 	defaultBranch: 'main',
 	config: config({ ...t, calls })
