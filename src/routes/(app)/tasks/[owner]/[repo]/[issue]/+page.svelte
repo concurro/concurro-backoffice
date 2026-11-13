@@ -22,7 +22,7 @@
 	import PrReviewPanel from '#lib/components/task/PrReviewPanel.svelte';
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
-	import { ciMeta, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
+	import { ciMeta, stepIndex, steps, taskStage, taskStageMeta } from '#lib/meta.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -86,7 +86,7 @@
 		<Inline text={task.alert.body} />
 		{#if task.question}<blockquote>{task.question}</blockquote>{/if}
 		{#snippet actions()}
-			{#if task.paused}<Button size="sm" href={withBase('/me/credentials')}>Fix credentials</Button>{/if}
+			{#if taskStage(task) === 'awaiting_credentials'}<Button size="sm" href={withBase('/me/credentials')}>Fix credentials</Button>{:else if taskStage(task) === 'budget_exhausted'}<span>A writer must review the budget before Retry; replacing credentials does not reset it.</span>{/if}
 		{/snippet}
 	</Alert>
 

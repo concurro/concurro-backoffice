@@ -115,6 +115,8 @@ export interface Sponsorship {
     charged_calls?: ChargedCalls[];
     /** Sanitized gateway observations; absent usage stays unknown. */
     observations_status?: 'available' | 'unknown';
+    /** Native log availability does not imply complete provider usage. */
+    native_status?: 'available' | 'unavailable' | 'disabled' | 'unknown';
     observations?: { request: string; source?: string; completed?: boolean; category: string | null; usage: { input_tokens: number; output_tokens: number } | null; binding: { sponsorship_provider: Provider; sponsor: string; credential_version: number } }[];
     status: string;
     task_status?: string | null;
@@ -442,7 +444,8 @@ export interface OperatorStatus {
 }
 
 export interface NeedsYouItem {
-	kind: 'plan_approval' | 'input_needed' | 'credentials' | 'ci_red';
+	/** Budget attention stays separate from token replacement. */
+	kind: 'plan_approval' | 'input_needed' | 'credentials' | 'budget' | 'ci_red';
 	task: Task;
 	text: string;
 }

@@ -56,6 +56,7 @@
 	{/each}
     {#if projection?.charged_calls?.some((row) => row.kind === 'org')}<p class="notice">Organization-funded attempts: {projection.charged_calls.filter((row) => row.kind === 'org').reduce((sum, row) => sum + row.calls, 0)}. These are not charged to the displayed personal sponsors.</p>{/if}
 	<p class="notice">Sponsor replaces only this provider’s owner. Withdrawal affects only your own consent, including older sponsorship revisions; it does not revoke your token, change the other provider or remove design approvals. Self-withdrawal remains available if writer access is lost.</p>
+	{#if projection?.native_status === 'unavailable'}<p class="notice">Native gateway log evidence is unavailable. Missing usage stays unknown; provider observations below remain recorded.</p>{/if}
 	{#if projection?.observations_status === 'unknown'}<p class="notice">Gateway request evidence is unavailable. Usage and completion are unknown.</p>{/if}
 	{#if projection?.observations?.length}
         <details><summary>Gateway request evidence</summary><ul>{#each projection.observations as event}<li>{event.binding.sponsorship_provider} · owner {event.binding.sponsor} · credential version {event.binding.credential_version} · {event.source ?? 'gateway'} · {event.category ?? (event.source === 'provider' && event.completed ? 'provider completed' : 'request observed')} · {event.usage ? `${event.usage.input_tokens} input / ${event.usage.output_tokens} output tokens` : 'usage unknown'}</li>{/each}</ul></details>

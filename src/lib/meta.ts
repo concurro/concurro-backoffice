@@ -143,8 +143,18 @@ export const isMerged = (stage: Stage) => MERGED_STAGES.includes(stage);
 export const mergedEarly = (task: Task) => task.stage === 'observed_merged' && task.completion?.handedOff === false;
 export const mergedEarlyMeta = m('Merged early', 'warning', GitMerge);
 
+/** Paused tasks remain visible in parked totals and filters in both API and mock mode. */
+export const PARKED_STAGES: Stage[] = ['blocked', 'escalated', 'stopped', 'awaiting_credentials', 'budget_exhausted'];
+
+/** Canonical live stage wins; a legacy blocked summary may use the newer task projection. */
+export function taskStage(task: Task): Stage {
+    if (task.stage !== 'blocked') return task.stage;
+    const pause = task.sponsorships?.task_stage ?? task.paused;
+    return pause === 'awaiting_credentials' || pause === 'budget_exhausted' ? pause : task.stage;
+}
+
 /** The stage badge for a task, distinguishing merges that skipped handoff. */
-export const taskStageMeta = (task: Task): Meta => (mergedEarly(task) ? mergedEarlyMeta : stageMeta[task.stage]);
+export const taskStageMeta = (task: Task): Meta => (mergedEarly(task) ? mergedEarlyMeta : stageMeta[taskStage(task)]);
 
 /** Pipeline steps shown in the stage stepper, and which stages belong to each. */
 export const steps: { key: string; label: string; stages: Stage[] }[] = [

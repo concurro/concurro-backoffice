@@ -11,7 +11,7 @@
 	import Panel from '#lib/components/Panel.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
-	import { MERGED_STAGES, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
+	import { MERGED_STAGES, PARKED_STAGES, taskStage, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
 	import { session } from '#lib/api/index.ts';
 	import { needsYou } from '#lib/needs-you.ts';
 	import { withBase } from '#lib/paths.ts';
@@ -21,7 +21,7 @@
 	let { data }: PageProps = $props();
 
 	const ACTIVE: Stage[] = ['intake', 'plan', 'plan_qc', 'implement', 'publish', 'review'];
-	const PARKED: Stage[] = ['blocked', 'escalated', 'stopped'];
+	const PARKED = PARKED_STAGES;
 	const DONE: Stage[] = [...MERGED_STAGES, 'closed', 'rejected'];
 
 	function tiles(tasks: Task[]) {
@@ -29,7 +29,7 @@
 		return [
 			{ label: 'Active', value: count((t) => ACTIVE.includes(t.stage)), hint: 'Agents are working', icon: Activity, tone: 'info' },
 			{ label: 'Awaiting human', value: count((t) => t.stage === 'clarify' || t.stage === 'planned'), hint: 'Approval or input needed', icon: UserRoundCheck, tone: 'warning' },
-			{ label: 'Blocked', value: count((t) => t.stage === 'blocked' || t.stage === 'escalated'), hint: 'Paused or escalated', icon: OctagonAlert, tone: 'danger' },
+			{ label: 'Blocked', value: count((t) => ['blocked', 'escalated', 'awaiting_credentials', 'budget_exhausted'].includes(taskStage(t))), hint: 'Paused or escalated', icon: OctagonAlert, tone: 'danger' },
 			{ label: 'Ready for merge', value: count((t) => t.stage === 'gates' && (t.pr?.ready ?? true)), hint: 'Handed off to maintainers', icon: GitPullRequestArrow, tone: 'success' }
 		] satisfies { label: string; value: number; hint: string; icon: IconType; tone: Tone }[];
 	}
@@ -37,17 +37,18 @@
 	const needMeta: Record<NeedsYouItem['kind'], { label: string; icon: IconType; tone: Tone; action: string; href?: string }> = {
 		plan_approval: { label: 'Plan approval', icon: FileCheck, tone: 'accent', action: 'Review plan' },
 		input_needed: { label: 'Input needed', icon: MessageCircleQuestionMark, tone: 'warning', action: 'Answer' },
+		budget: { label: 'Budget', icon: OctagonAlert, tone: 'warning', action: 'Open task' },
 		credentials: { label: 'Credentials', icon: KeyRound, tone: 'danger', action: 'Fix credentials', href: withBase('/me/credentials') },
 		ci_red: { label: 'CI failing', icon: CircleX, tone: 'danger', action: 'Open task' }
 	};
 
 	function stageCounts(target: Target, tasks: Task[]) {
 		const mine = tasks.filter((t) => t.owner === target.owner && t.repo === target.repo);
-		const live = mine.filter((t) => !PARKED.includes(t.stage) && !DONE.includes(t.stage));
+		const live = mine.filter((t) => !PARKED.includes(taskStage(t)) && !DONE.includes(t.stage));
 		return {
 			total: mine.length,
 			perStep: steps.map((s, i) => ({ label: s.label, n: live.filter((t) => stepIndex(t.atStage) === i).length })),
-			parked: mine.filter((t) => PARKED.includes(t.stage)).length,
+			parked: mine.filter((t) => PARKED.includes(taskStage(t))).length,
 			done: mine.filter((t) => DONE.includes(t.stage)).length
 		};
 	}

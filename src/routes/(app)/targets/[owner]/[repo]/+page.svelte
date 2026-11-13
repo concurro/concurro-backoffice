@@ -14,7 +14,7 @@
 	import TaskSignals from '#lib/components/TaskSignals.svelte';
 	import { duration, relTime, taskHref } from '#lib/format.ts';
 	import { withBase } from '#lib/paths.ts';
-	import { roleLabel, taskStageMeta } from '#lib/meta.ts';
+	import { PARKED_STAGES, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
 	import { profile } from '#lib/api/index.ts';
 	import type { ActionsRun, Stage, Task, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
@@ -27,10 +27,10 @@
 		all: { label: 'All stages' },
 		active: { label: 'Active', stages: ['intake', 'plan', 'plan_qc', 'implement', 'publish', 'review'] },
 		human: { label: 'Awaiting human', stages: ['clarify', 'planned', 'gates'] },
-		parked: { label: 'Blocked or stopped', stages: ['blocked', 'escalated', 'stopped'] },
+		parked: { label: 'Blocked or stopped', stages: PARKED_STAGES },
 		done: { label: 'Finished', stages: ['merged', 'closed', 'rejected'] }
 	};
-	const inGroup = (tasks: Task[]) => tasks.filter((t) => groups[group].stages?.includes(t.stage) ?? true).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	const inGroup = (tasks: Task[]) => tasks.filter((t) => groups[group].stages?.includes(taskStage(t)) ?? true).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
 	const runTone: Record<ActionsRun['status'], Tone> = { success: 'success', failure: 'danger', in_progress: 'info', queued: 'neutral', cancelled: 'warning' };
 </script>
@@ -87,7 +87,7 @@
 										<a href={taskHref(t)}><Inline text={t.title} /></a>
 										<p class="sub">opened by {t.author} · {t.labels.join(' · ')}</p>
 									</td>
-									<td class="nowrap"><Badge meta={taskStageMeta(t)} />{#if t.paused}<p class="sub mono">awaiting_credentials</p>{/if}</td>
+									<td class="nowrap"><Badge meta={taskStageMeta(t)} /></td>
 									<td>{#each Object.entries(t.sponsorships?.slots ?? {}) as [provider, slot]}{#if slot?.sponsor_id}<p class="sub">{provider}: @{slot.login ?? slot.sponsor_id}</p>{/if}{/each}<span class="muted">{t.sponsorships?.status ?? 'pending'}</span></td>
 									<td><TaskSignals task={t} /></td>
 									<td class="r nowrap muted">{relTime(t.updatedAt)}</td>

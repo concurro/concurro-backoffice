@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MOCK } from '#lib/api/mode.ts';
 	import { X } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
 	import { dismiss, toasts } from '#lib/state/toast.svelte.ts';
@@ -9,7 +10,7 @@
 		<div class="toast tone-{t.tone}" transition:fly={{ y: 8, duration: 140 }}>
 			<span class="dot" aria-hidden="true"></span>
 			<span class="text">{t.text}</span>
-			<span class="local">mock · local only</span>
+			{#if MOCK}<span class="local">mock · local only</span>{/if}
 			<button onclick={() => dismiss(t.id)} aria-label="Dismiss"><X size={14} /></button>
 		</div>
 	{/each}
