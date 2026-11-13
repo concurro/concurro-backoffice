@@ -103,7 +103,9 @@ Built with SvelteKit 3 and Svelte 5 runes. SvelteKit 3 reads its configuration f
 The API can persist issue metadata and lightweight checkpoint summaries locally. When it returns
 an older snapshot during a background refresh, the page shows its observation time and checks
 for completion without hiding the saved content. Refresh failures remain visible with a retry
-action. Fixture mode and APIs without cache metadata retain their existing behavior.
+action; retries are followed to completion even while the previous failure is still displayed.
+The warning timestamp identifies the last verified snapshot. Review times appear only when
+recorded. Fixture mode and APIs without cache metadata retain their existing behavior.
 
 Targets and their task details require write, maintain or admin permission on the upstream
 repository. Fork write permission is not required. The API enforces this for direct URLs as

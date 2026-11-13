@@ -38,7 +38,7 @@
 					<Badge meta={verdictMeta[v.verdict]} />
 				</div>
 			{/each}
-			<span class="muted when">Reviewed {relTime(round.at)}</span>
+			{#if Number.isFinite(Date.parse(round.at))}<span class="muted when">Reviewed {relTime(round.at)}</span>{/if}
 		</div>
 
 		<div class="findings-head">
