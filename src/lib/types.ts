@@ -183,6 +183,19 @@ export type TaskSection = 'intake' | 'plan' | 'design' | 'implement' | 'review' 
 
 /** Issue summary and target configuration used by the page shell. */
 export interface TaskView {
+	/** Freshness of the persistent issue snapshot, when enabled by the API. */
+	cache?: {
+		/** Time GitHub last supplied a complete verified snapshot. */
+		observedAt: string;
+		/** Whether the snapshot is due for refresh or its latest refresh failed. */
+		stale: boolean;
+		/** Whether the API is currently refreshing this issue. */
+		refreshing: boolean;
+		/** A recently posted command is awaiting a checkpoint update. */
+		pendingCommand?: boolean;
+		/** Public explanation of the latest failed refresh. */
+		error: string | null;
+	};
 	/** Lightweight task metadata. */
 	task: Task;
 	/** Target metadata and model profiles. */
