@@ -54,6 +54,8 @@ export interface CredentialRequirement {
     route: string | null;
     provider: Provider | null;
     status?: string;
+    /** Exact current credential version, absent when no record is available. */
+    version?: number | null;
 }
 
 /** An issue identity works before a task checkpoint exists. */
@@ -68,9 +70,49 @@ export interface SponsorSlot {
     provenance?: string;
 }
 
+/** Automatic recovery is a scheduling receipt, never permission to skip admission checks. */
+export interface CredentialRecovery {
+    /** Whether recorded consent and failure class permit automatic reconsideration. */
+    eligible: boolean;
+    /** Durable earliest retry time in Unix seconds. */
+    not_before: number;
+    /** Current source-validated delivery, if every required route has candidate evidence. */
+    delivery?: { id: string; due_at: number };
+    /** Delivery already checked; it does not represent a queued retry. */
+    consumed?: string | null;
+    /** Last recovery check outcome. */
+    status?: string;
+}
+
+/** Authoritative charged attempts, including historical owners and credential versions. */
+export interface ChargedCalls {
+    /** Nonsecret ledger identity. */
+    id: string;
+    /** Actual funding source for these attempts. */
+    kind: 'org' | 'contributed';
+    /** Canonical provider derived by the service from the recorded route. */
+    provider: Provider | null;
+    /** Recorded model profile or harness display name. */
+    profile?: string;
+    /** Stable actor who paid these attempts; absent for organization funding. */
+    sponsor?: string | null;
+    /** Frozen route and replacement version. */
+    route?: string | null;
+    version?: number | null;
+    /** Count already debited from the task budget. */
+    calls: number;
+}
+
 /** Nonsecret daemon projection; pending source evidence must stay visibly pending. */
 export interface Sponsorship {
     funding?: 'org' | 'contributed' | 'unknown';
+    /** Actual task stage and total attempts; absent before enrollment. */
+    task_stage?: string | null;
+    calls?: number;
+    /** Nonsecret automatic scheduling state, distinct from provider consent. */
+    recovery?: CredentialRecovery | null;
+    /** Historical debits, not prospective sponsor ownership. */
+    charged_calls?: ChargedCalls[];
     /** Sanitized gateway observations; absent usage stays unknown. */
     observations_status?: 'available' | 'unknown';
     observations?: { request: string; source?: string; completed?: boolean; category: string | null; usage: { input_tokens: number; output_tokens: number } | null; binding: { sponsorship_provider: Provider; sponsor: string; credential_version: number } }[];
