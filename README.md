@@ -82,6 +82,9 @@ sponsorship usage projection.
 
 ## Layout
 
+Sidebar targets are grouped by owner with indented repository links. Long names wrap;
+collapsed links retain their full `owner/repository` labels and tooltips.
+
 | Path | Contents |
 | ---- | ---- |
 | `src/lib/styles/tokens.css` | Design tokens for both themes; the only place colors are defined |
