@@ -94,6 +94,7 @@ export function runsFor(target: { owner: string; repo: string }, issues: number[
 			attempt: 1,
 			title: `${runTitles[i]} ${Math.max(turn, 1)}`,
 			status,
+			association: 'assigned' as const,
 			task: { owner: target.owner, repo: target.repo, issue },
 			issue,
 			turn: Math.max(turn, 1),

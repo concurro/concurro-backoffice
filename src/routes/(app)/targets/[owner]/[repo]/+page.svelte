@@ -132,12 +132,22 @@
 						<thead><tr><th>Run</th><th>Agent turn</th><th>Status</th><th>Task</th><th class="r">Started</th><th class="r">Duration</th></tr></thead>
 						<tbody>
 							{#each runs as run (run.id)}
-								{@const task = run.task ?? { owner: target.owner, repo: target.repo, issue: run.issue }}
 								<tr>
-									<td class="mono nowrap">{run.id}</td>
-									<td class="title"><a href={`${taskHref(task)}/turns/${run.turn}`}>{run.title}</a></td>
+									<td class="mono nowrap">
+										{run.id}{#if run.attempt && run.attempt > 1}<span class="muted"> ·{run.attempt}</span>{/if}
+									</td>
+									<td class="title">
+										{#if run.task && run.turn}
+											<a href={`${taskHref(run.task)}/turns/${run.turn}`}>{run.title}</a>
+										{:else}
+											<span class="muted">{run.title}</span>
+										{/if}
+										{#if run.association === 'dispatched'}<span class="hint">dispatched only</span>{/if}
+									</td>
 									<td><Badge tone={runTone[run.status]}>{run.status}</Badge></td>
-									<td class="mono nowrap"><a href={taskHref(task)}>{task.repo}#{task.issue}</a></td>
+									<td class="mono nowrap">
+										{#if run.task}<a href={taskHref(run.task)}>{run.task.repo}#{run.task.issue}</a>{:else}<span class="muted">—</span>{/if}
+									</td>
 									<td class="r nowrap muted">{relTime(run.startedAt)}</td>
 									<td class="r nowrap">{duration(run.durationS * 1000)}</td>
 								</tr>
@@ -175,6 +185,16 @@
 {/await}
 
 <style>
+	.hint {
+		margin-left: var(--s-2);
+		padding: 0 6px;
+		border: 1px solid var(--border);
+		border-radius: var(--r-full);
+		color: var(--text-3);
+		font-size: var(--fs-2xs);
+		line-height: 17px;
+		white-space: nowrap;
+	}
 	.pair,
 	.branch {
 		display: inline-flex;

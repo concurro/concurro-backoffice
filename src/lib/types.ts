@@ -310,17 +310,20 @@ export interface ActivityItem {
 /** One GitHub Actions run, with the task and turns the service recorded for it. */
 export interface ActionsRun {
 	id: number;
+	/** The attempt shown: the one that served the turns, which is always 1 for an attributed run. */
 	attempt?: number;
 	title: string;
 	/** GitHub's own run status, not a turn outcome. */
 	status: 'success' | 'failure' | 'in_progress' | 'queued' | 'cancelled';
-	/** The task this run served; a run serves one task's turns. */
-	task?: { owner: string; repo: string; issue: number };
-	issue: number;
+	/** `assigned` means a turn recorded this run; `dispatched` means its session was only sent here. */
+	association?: 'assigned' | 'dispatched' | null;
+	/** The task this run served; null when no recorded turn names it. */
+	task?: { owner: string; repo: string; issue: number } | null;
+	issue: number | null;
 	/** The first turn the run served, for the diagnostics link. */
-	turn: number;
+	turn: number | null;
 	startedAt: string;
-	/** Wall-clock seconds GitHub reports for the run; 0 while it is still going. */
+	/** Estimated elapsed time from GitHub's run timestamps, not measured job duration; 0 while running. */
 	durationS: number;
 }
 
