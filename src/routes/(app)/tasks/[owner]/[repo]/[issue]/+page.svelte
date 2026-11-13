@@ -46,6 +46,13 @@
 		? { ...phaseData.value.task, pr: task.pr } : undefined);
 	const timelineTask = $derived(timelineData?.value?.task.revision === summary?.revision ? timelineData?.value?.task : undefined);
 	const ciLoading = $derived(!!pullData?.loading && !pullData.value);
+	const snapshot = $derived(data.resource.value?.cache);
+	$effect(() => {
+		if ((snapshot?.refreshing || snapshot?.pendingCommand) && !snapshot?.error && !data.resource.loading && !data.resource.error) {
+			const timer = setTimeout(data.resource.refresh, snapshot?.pendingCommand ? 5000 : 1000);
+			return () => clearTimeout(timer);
+		}
+	});
 	let refreshingRevision = '';
 	$effect(() => {
 		const changed = [phaseData?.value?.task, timelineData?.value?.task, livePull]
@@ -107,6 +114,16 @@
 	</PageHeader>
 
 	{#if pullData?.error}<ErrorState error={pullData.error} retry={pullData.refresh} />{/if}
+	{#if snapshot?.error}
+		<Alert tone="caution" title="Showing saved issue data">
+			{snapshot.error} Last updated {relTime(snapshot.observedAt)}.
+			{#snippet actions()}<Button size="sm" onclick={data.resource.refresh}>Check for updates</Button>{/snippet}
+		</Alert>
+	{:else if snapshot?.pendingCommand}
+		<p class="muted" role="status">Command sent. Waiting for the issue to update…</p>
+	{:else if snapshot?.refreshing}
+		<p class="muted" role="status">Refreshing issue… Showing the snapshot from {relTime(snapshot.observedAt)}.</p>
+	{/if}
 	<StageStepper {task} selected={phase} onselect={select} />
 
 	<Alert tone={task.alert.tone} title={task.alert.title}>

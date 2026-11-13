@@ -2,7 +2,7 @@ import { cached, clearTaskCache } from './cache.svelte.ts';
 import { api as fixtures } from '#lib/mock/api.ts';
 import { ME, profiles, users } from '#lib/mock/reference.ts';
 import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialRouteId, Task, TaskSection, TurnRuns } from '#lib/types.ts';
+import type { Command, CredentialRouteId, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
 import { remember, session } from './session.svelte.ts';
 
 /** The original mockup: fixtures served with an artificial delay, commands applied to in-browser state. */
@@ -22,7 +22,7 @@ export const api = {
 	task: fixtures.task,
 	/** Exercise the same independently loaded page sections with fixture data. */
 	taskSummary(owner: string, repo: string, issue: number) {
-		return cached(`task:${owner}/${repo}/${issue}`, async () => {
+		return cached<TaskView>(`task:${owner}/${repo}/${issue}`, async () => {
 			const view = await fixtures.task(owner, repo, issue);
 			const t = view.task;
 			return { ...view, task: { ...t, body: undefined,
