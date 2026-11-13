@@ -23,7 +23,7 @@ export type Role = 'triage' | 'planner' | 'plan_reviewer' | 'implementer' | 'pr_
 export type Provider = 'anthropic' | 'openai';
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 export type AlertTone = 'note' | 'tip' | 'warning' | 'caution';
-export type CiStatus = 'passing' | 'failing' | 'pending' | 'none';
+export type CiStatus = 'passing' | 'failing' | 'pending' | 'none' | 'unknown';
 export type Command = 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor' | 'withdraw';
 
 export interface ModelProfile {
@@ -105,6 +105,11 @@ export interface ChargedCalls {
 
 /** Nonsecret daemon projection; pending source evidence must stay visibly pending. */
 export interface Sponsorship {
+    /** Nonwriters receive only their own consent, without task data or other sponsors. */
+    scope?: 'own';
+    /** Sanitized own transition receipts and withdrawal cutoffs. */
+    history?: { transition?: string; provider?: string; reason?: string; cutoff?: number | null }[];
+
     funding?: 'org' | 'contributed' | 'unknown';
     /** Actual task stage and total attempts; absent before enrollment. */
     task_stage?: string | null;
@@ -149,7 +154,7 @@ export interface Target {
 	/** Model profiles the roster refers to, from the target configuration. */
 	profiles?: ModelProfile[];
 	credentialRequirements?: CredentialRequirement[] | null;
-	/** Whether the signed-in user can push to the target (and so run commands). */
+	/** Whether the signed-in user has write access to the upstream repository. */
 	writer?: boolean;
 }
 
@@ -187,7 +192,8 @@ export interface IntakeRound {
 export interface Objection {
 	id: string;
 	text: string;
-	resolved: boolean;
+	/** Absent on an archived generation: historical concern text, with no current ledger status. */
+	resolved?: boolean;
 }
 
 export interface DesignReview {
@@ -200,7 +206,10 @@ export interface DesignReview {
 export interface DesignReviewGeneration {
 	generation: number;
 	planId: string;
+	/** Empty when the engine recorded no time for this generation. */
 	at: string;
+	/** Why this generation was invalidated; empty for the current one. */
+	reason?: string;
 	reviews: DesignReview[];
 }
 
@@ -268,7 +277,39 @@ export interface TaskCompletion {
 	at: string;
 }
 
+/** Independently loaded issue-page content. */
+export type TaskSection = 'intake' | 'plan' | 'design' | 'implement' | 'review' | 'handoff' | 'timeline' | 'pull';
+
+/** Issue summary and target configuration used by the page shell. */
+export interface TaskView {
+	/** Upstream writer authority for new task/provider commands. */
+	issueWriter: boolean;
+	/** Freshness of the persistent issue snapshot, when enabled by the API. */
+	cache?: {
+		/** Time GitHub last supplied a complete verified snapshot. */
+		observedAt: string;
+		/** Whether the snapshot is due for refresh or its latest refresh failed. */
+		stale: boolean;
+		/** Whether the API is currently refreshing this issue. */
+		refreshing: boolean;
+		/** A recently posted command is awaiting a checkpoint update. */
+		pendingCommand?: boolean;
+		/** Public explanation of the latest failed refresh. */
+		error: string | null;
+	};
+	/** Lightweight task metadata. */
+	task: Task;
+	/** Target metadata and model profiles. */
+	target: Target;
+}
+
 export interface Task {
+	/** Checkpoint and issue revision used to separate cached phase responses. */
+	revision?: string;
+	/** Recorded work in each step, independent of loaded phase bodies. */
+	phaseRecords?: boolean[];
+	/** Current approval identity, available before the plan body is fetched. */
+	currentPlan?: Pick<PlanVersion, 'id'> & Partial<Pick<PlanVersion, 'version' | 'summary'>>;
 	owner: string;
 	repo: string;
 	issue: number;
@@ -321,6 +362,25 @@ export interface RunJob {
 	durationS: number;
 }
 
+/** GitHub's evidence for one session's workflow run attempt. */
+export interface TurnRun {
+	id: number;
+	attempt: number;
+	url: string;
+	workflow: string;
+	status: string;
+	conclusion: string | null;
+	session: string;
+	association: 'assigned' | 'dispatched';
+	jobs: { id: number; name: string; url: string; status: string; conclusion: string | null; durationS: number | null; runner: string | null; labels: string[] }[] | null;
+}
+
+/** Missing run history or a failed lookup is reported separately from an empty jobs list. */
+export interface TurnRuns {
+	runs: TurnRun[];
+	message: string | null;
+}
+
 export interface Turn {
 	/** Exchange turn ID (live data only). */
 	id?: string;
@@ -333,13 +393,13 @@ export interface Turn {
 	startedAt: string;
 	queuedMs: number;
 	durationMs: number;
-	tokens: { input: number; cached: number; output: number };
+	tokens: { input: number | null; cached: number | null; output: number | null };
 	run: {
-		id: number;
-		attempt: number;
-		workflow: string;
+		id: number | null;
+		attempt: number | null;
+		workflow: string | null;
 		runner: string;
-		jobs: RunJob[];
+		jobs: RunJob[] | null;
 		diagnosis?: { tone: AlertTone; title: string; body: string };
 	};
 	prompt: { instructions: string; snapshot: string; schema: string; untrusted: string };
@@ -402,14 +462,33 @@ export interface ActivityItem {
 	tone?: Tone;
 }
 
+/** One GitHub Actions run, with the task and turns the service recorded for it. */
 export interface ActionsRun {
 	id: number;
+	/** The attempt shown: the one that served the turns, which is always 1 for an attributed run. */
+	attempt?: number;
 	title: string;
+	/** GitHub's own run status, not a turn outcome. */
 	status: 'success' | 'failure' | 'in_progress' | 'queued' | 'cancelled';
-	issue: number;
-	turn: number;
+	/** `assigned` means a turn recorded this run; `dispatched` means its session was only sent here. */
+	association?: 'assigned' | 'dispatched' | null;
+	/** The task this run served; null when no recorded turn names it. */
+	task?: { owner: string; repo: string; issue: number } | null;
+	issue: number | null;
+	/** The first turn the run served, for the diagnostics link. */
+	turn: number | null;
 	startedAt: string;
+	/** Estimated elapsed time from GitHub's run timestamps, not measured job duration; 0 while running. */
 	durationS: number;
+}
+
+/** `GET /api/targets/{owner}/{repo}`; `runsMessage` says why the run list is empty. */
+export interface TargetView {
+	issues: IssueIntent[];
+	target: Target;
+	tasks: Task[];
+	runs: ActionsRun[];
+	runsMessage: string | null;
 }
 
 export interface OperatorStatus {

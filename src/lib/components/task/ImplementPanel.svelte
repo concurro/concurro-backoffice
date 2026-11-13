@@ -7,7 +7,7 @@
 	import EmptyState from '../EmptyState.svelte';
 	import Panel from '../Panel.svelte';
 
-	let { task, turns }: { task: Task; turns: string } = $props();
+	let { task, turns, ciLoading = false }: { task: Task; turns: string; /** Live CI is still being fetched. */ ciLoading?: boolean } = $props();
 </script>
 
 <Panel title="Implementation" id="implementation">
@@ -35,7 +35,7 @@
 				{/if}
 			</dd>
 			<dt>CI</dt>
-			<dd><Badge plain meta={ciMeta[task.pr.ci]} /></dd>
+			<dd>{#if ciLoading}<span class="muted">Loading CI…</span>{:else}<Badge plain meta={ciMeta[task.pr.ci]} />{/if}</dd>
 		</dl>
 	{:else}
 		<EmptyState

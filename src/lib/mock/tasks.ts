@@ -45,12 +45,15 @@ function designGen(
 	minutes: number,
 	verdicts: [DesignDecision | 'pending', DesignDecision | 'pending'],
 	objections: [string[], string[]] = [[], []],
-	resolved = true
+	/** `archived` drops the ledger status, as a superseded generation has none. */
+	resolved: boolean | 'archived' = true,
+	reason = ''
 ): DesignReviewGeneration {
 	return {
 		generation,
 		planId,
 		at: ago(minutes),
+		reason,
 		reviews: reviewerProfiles(t, 'plan_reviewer').map((r, i) => ({
 			agent: r.agent,
 			profile: r.profile,
@@ -58,7 +61,7 @@ function designGen(
 			objections: objections[i].map((text, j) => ({
 				id: `O-${generation}${i ? 'b' : 'a'}${j + 1}`,
 				text,
-				resolved
+				...(resolved === 'archived' ? {} : { resolved })
 			}))
 		}))
 	};
@@ -313,13 +316,22 @@ const hero: Task = {
 	],
 	approvedPlanId: 'pl_c41f9e',
 	designReview: [
-		designGen(LC, 1, 'pl_3a91c0', 2 * D + 4 * H, ['revise', 'revise'], [
+		designGen(
+			LC,
+			1,
+			'pl_3a91c0',
+			2 * D + 4 * H,
+			['revise', 'revise'],
 			[
-				'Rounding policy is unspecified. Truncation lets one-minor-unit drift accumulate across legs.',
-				'No handling for zero or negative rates.'
+				[
+					'Rounding policy is unspecified. Truncation lets one-minor-unit drift accumulate across legs.',
+					'No handling for zero or negative rates.'
+				],
+				['A rate with an arbitrarily old `as_of` is accepted. Define a staleness bound.']
 			],
-			['A rate with an arbitrarily old `as_of` is accepted. Define a staleness bound.']
-		]),
+			'archived',
+			'Design reviewers require a revision.'
+		),
 		designGen(LC, 2, 'pl_7d02be', 2 * D + 2 * H, ['approve', 'revise'], [
 			[],
 			['The plan does not say whether stored postings are re-validated. A retroactive check would make existing ledgers unloadable.']

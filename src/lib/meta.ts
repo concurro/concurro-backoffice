@@ -89,7 +89,8 @@ export const ciMeta: Record<CiStatus, Meta> = {
 	passing: m('CI passing', 'success', CircleCheck),
 	failing: m('CI failing', 'danger', CircleX),
 	pending: m('CI pending', 'warning', Loader),
-	none: m('No CI', 'neutral', CircleDashed)
+	none: m('No CI', 'neutral', CircleDashed),
+	unknown: m('CI unavailable', 'neutral', CircleDashed)
 };
 
 export const verdictMeta: Record<Verdict, Meta> = {
@@ -170,7 +171,7 @@ export const stepIndex = (stage: Stage) => steps.findIndex((s) => s.stages.inclu
 
 /** Whether a step has recorded work, e.g. from a run that a revision or reassessment later superseded. */
 export const stepHasRecord = (task: Task, i: number): boolean =>
-	[task.intake.length, task.plans.length, task.designReview.length, task.pr ? 1 : 0, task.rounds.length, 0][i] > 0;
+	task.phaseRecords?.[i] ?? ([task.intake.length, task.plans.length, task.designReview.length, task.pr ? 1 : 0, task.rounds.length, 0][i] > 0);
 
 /** Fixed and obsolete findings are resolved; open and withdrawn ones block the merge whatever their severity. */
 export const isResolved = (status: FindingStatus) => status === 'fixed' || status === 'obsolete';

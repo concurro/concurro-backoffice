@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Bot, ExternalLink, FileDiff, FileJson, MessagesSquare, ShieldAlert } from 'lucide-svelte';
+	import { Bot, FileDiff, FileJson, MessagesSquare, ShieldAlert } from 'lucide-svelte';
 	import Alert from '#lib/components/Alert.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import CodeBlock from '#lib/components/CodeBlock.svelte';
 	import Collapsible from '#lib/components/Collapsible.svelte';
-	import DataTable from '#lib/components/DataTable.svelte';
+	import TurnRunner from '#lib/components/task/TurnRunner.svelte';
 	import DiffView from '#lib/components/DiffView.svelte';
 	import EmptyState from '#lib/components/EmptyState.svelte';
 	import Inline from '#lib/components/Inline.svelte';
@@ -13,13 +13,12 @@
 	import { absTime, duration, parseUnified, relTime } from '#lib/format.ts';
 	import { outcomeMeta, roleLabel, stageMeta } from '#lib/meta.ts';
 	import { profile } from '#lib/api/index.ts';
-	import type { Tone, TranscriptItem, Turn } from '#lib/types.ts';
+	import type { TranscriptItem } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
 	let tab = $state('transcript');
 
-	const jobTone: Record<Turn['run']['jobs'][number]['status'], Tone> = { success: 'success', failure: 'danger', cancelled: 'warning', skipped: 'neutral' };
 
 	/** Pairs each tool call with its result so they render as one collapsible step. */
 	function steps(items: TranscriptItem[]) {
@@ -63,8 +62,8 @@
 			<div><dt>Profile</dt><dd><span class="mono">{turn.profile}</span> <span class="muted">{[p.provider, p.model, p.effort].filter(Boolean).join(" · ")}</span></dd></div>
 			<div><dt>Queued</dt><dd>{duration(turn.queuedMs)}</dd></div>
 			<div><dt>Duration</dt><dd>{duration(turn.durationMs)}</dd></div>
-			<div><dt>Tokens in</dt><dd>{turn.tokens.input.toLocaleString()} <span class="muted">({turn.tokens.cached.toLocaleString()} cached)</span></dd></div>
-			<div><dt>Tokens out</dt><dd>{turn.tokens.output.toLocaleString()}</dd></div>
+			<div><dt>Tokens in</dt><dd>{turn.tokens.input?.toLocaleString() ?? 'Unavailable'}{#if turn.tokens.cached !== null} <span class="muted">({turn.tokens.cached.toLocaleString()} cached)</span>{/if}</dd></div>
+			<div><dt>Tokens out</dt><dd>{turn.tokens.output?.toLocaleString() ?? 'Unavailable'}</dd></div>
 		</dl>
 		{#if turn.run.diagnosis}
 			<Alert tone={turn.run.diagnosis.tone} title={turn.run.diagnosis.title}><Inline text={turn.run.diagnosis.body} /></Alert>
@@ -126,32 +125,14 @@
 					<EmptyState icon={FileDiff} title="No code changes" text={turn.role === 'implementer' ? 'This implementation turn did not produce a commit.' : 'Only implementation turns change code.'} />
 				{/if}
 			{:else}
-				<dl class="facts num">
-					<div><dt>Actions run</dt><dd><a href="#main" class="mono">{turn.run.id} <ExternalLink size={12} aria-hidden="true" /></a></dd></div>
-					<div><dt>Workflow</dt><dd class="mono">{turn.run.workflow}</dd></div>
-					<div><dt>Attempt</dt><dd>{turn.run.attempt}</dd></div>
-					<div><dt>Runner</dt><dd>{turn.run.runner}</dd></div>
-				</dl>
-				<h3 class="sub-h">Jobs</h3>
-				{#if turn.run.jobs.length}
-					<div class="boxed">
-						<DataTable label="Jobs">
-							<thead><tr><th>Job</th><th>Status</th><th class="r">Duration</th></tr></thead>
-							<tbody>
-								{#each turn.run.jobs as job}
-									<tr><td class="mono">{job.name}</td><td><Badge tone={jobTone[job.status]}>{job.status}</Badge></td><td class="r">{duration(job.durationS * 1000)}</td></tr>
-								{/each}
-							</tbody>
-						</DataTable>
-					</div>
-				{:else}
-					<EmptyState title="No jobs ran" text="GitHub never created a workflow run for this turn." />
-				{/if}
+				<TurnRunner owner={params.owner} repo={params.repo} issue={Number(params.issue)} identifier={turn.id ?? String(turn.n)} />
 				<h3 class="sub-h">Termination diagnosis</h3>
 				{#if turn.run.diagnosis}
 					<Alert tone={turn.run.diagnosis.tone} title={turn.run.diagnosis.title}><Inline text={turn.run.diagnosis.body} /></Alert>
+				{:else if turn.outcome === 'ok'}
+					<Alert tone="tip" title="Turn completed">The service recorded a successful result for this turn. The workflow job may continue serving other turns.</Alert>
 				{:else}
-					<Alert tone="tip" title="Completed normally">The agent job exited with code 0 and the result was settled.</Alert>
+					<EmptyState title="No termination diagnosis recorded" text="The turn outcome alone does not establish how its workflow job ended." />
 				{/if}
 			{/if}
 		</Tabs>
@@ -187,11 +168,6 @@
 	}
 	.facts dd {
 		margin: 0;
-	}
-	.facts dd a {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
 	}
 	.stack {
 		display: grid;
@@ -270,11 +246,6 @@
 	}
 	.sub-h {
 		margin: var(--s-4) 0 var(--s-2);
-	}
-	.boxed {
-		border: 1px solid var(--border);
-		border-radius: var(--r-md);
-		overflow: hidden;
 	}
 	@media (max-width: 560px) {
 		.tool {

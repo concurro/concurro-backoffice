@@ -15,7 +15,7 @@
 	const FEEDBACK_MAX = 4000;
 	const REVISIONS_MAX = 999;
 	const TERMINAL: Stage[] = [...MERGED_STAGES, 'closed', 'rejected', 'stopped'];
-	const plan = $derived(task.plans.at(-1));
+	const plan = $derived(task.plans.at(-1) ?? task.currentPlan);
 
 	interface Spec {
 		command: Command;
@@ -29,7 +29,7 @@
 	}
 	const specs = $derived<Spec[]>([
 		{ command: 'start', label: 'Start', icon: Play, enabled: task.stage === 'rejected' || task.stage === 'closed', why: 'The task has already started', title: 'Start this task?', body: 'Triage assesses the issue first. Starting spends model-call budget.', confirm: 'Start task' },
-		{ command: 'approve', label: 'Approve plan', icon: CircleCheck, enabled: task.stage === 'planned' && !!plan, why: 'No plan is waiting for approval', title: `Approve plan v${plan?.version ?? ''}?`, body: 'Implementation starts on the next free runner and follows this plan exactly. Later plan versions need a new approval.', confirm: 'Approve plan' },
+		{ command: 'approve', label: 'Approve plan', icon: CircleCheck, enabled: task.stage === 'planned' && !!plan, why: 'No plan is waiting for approval', title: `Approve plan${plan?.version ? ` v${plan.version}` : ''}?`, body: 'Implementation starts on the next free runner and follows this plan exactly. Later plan versions need a new approval.', confirm: 'Approve plan' },
 		{ command: 'retry', label: 'Retry', icon: RotateCcw, enabled: ['blocked', 'escalated', 'awaiting_credentials', 'budget_exhausted'].includes(task.stage) || task.pr?.ci === 'failing', why: 'Nothing has failed', title: 'Retry the last stage?', body: `The last stage runs again. Design approvals are preserved. ${MOCK ? 'You can give the agent feedback.' : 'You can grant extra plan revisions if the allowance ran out.'}`, confirm: 'Retry' },
 		{ command: 'resume', label: 'Resume', icon: StepForward, enabled: !!task.paused || ['stopped', 'blocked', 'awaiting_credentials', 'budget_exhausted'].includes(task.stage), why: 'The task is not paused or stopped', title: 'Resume this task?', body: 'The task adopts current settings and instructions and continues from where it stopped. Completed work, approvals and spent budgets are preserved.', confirm: 'Resume' },
 		{ command: 'stop', label: 'Stop', icon: Square, enabled: !TERMINAL.includes(task.stage), why: 'The task is not running', title: 'Stop this task?', body: 'Running turns are cancelled and no new turns start. You can resume later.', confirm: 'Stop task' },
@@ -68,7 +68,7 @@
 			const text = await actions.command(task, pending, arg);
 			toast(text, pending === 'invalidate' || pending === 'stop' ? 'warning' : 'success');
 			open = false;
-			if (!MOCK) await invalidateAll();
+			await invalidateAll();
 		} catch (error) {
 			toast(error instanceof Error ? error.message : 'The command could not be posted.', 'danger');
 		} finally {
@@ -98,8 +98,8 @@
 		</Alert>
 	{:else if pending === 'approve' && plan}
 		<dl class="facts">
-			<dt>Plan</dt><dd><span class="mono">{plan.id}</span> · v{plan.version}</dd>
-			<dt>Summary</dt><dd>{plan.summary}</dd>
+			<dt>Plan</dt><dd><span class="mono">{plan.id}</span>{#if plan.version} · v{plan.version}{/if}</dd>
+			{#if plan.summary}<dt>Summary</dt><dd>{plan.summary}</dd>{/if}
 			<dt>Budget left</dt><dd class="num">{task.budgets.modelCalls.max - task.budgets.modelCalls.used} model calls</dd>
 		</dl>
 	{:else if pending === 'retry' && MOCK}

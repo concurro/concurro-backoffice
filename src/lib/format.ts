@@ -1,7 +1,9 @@
 import { withBase } from './paths.ts';
 
+/** Format an elapsed time, leaving unavailable dates explicit. */
 export function relTime(iso: string): string {
 	const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+	if (!Number.isFinite(s)) return 'Unknown time';
 	if (s < 60) return 'just now';
 	if (s < 3600) return `${Math.floor(s / 60)}m ago`;
 	if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
@@ -20,8 +22,9 @@ export function duration(ms: number): string {
 	return m < 60 ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
 }
 
-export function tokens(n: number): string {
-	if (!n) return '—';
+/** Format a reported count, distinguishing zero from missing usage. */
+export function tokens(n: number | null): string {
+    if (n === null) return 'Unavailable';
 	return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
@@ -30,6 +33,9 @@ export const bytes = (s: string) => new TextEncoder().encode(s).length;
 /** Links under the base path. */
 export const taskHref = (t: { owner: string; repo: string; issue: number }) => withBase(`/tasks/${t.owner}/${t.repo}/${t.issue}`);
 export const targetHref = (t: { owner: string; repo: string }) => withBase(`/targets/${t.owner}/${t.repo}`);
+
+/** The issue on GitHub, where a writer gives commands themselves. */
+export const issueUrl = (t: { owner: string; repo: string; issue: number }) => `https://github.com/${t.owner}/${t.repo}/issues/${t.issue}`;
 
 export interface DiffLine {
 	kind: 'ctx' | 'add' | 'del' | 'hunk' | 'file';

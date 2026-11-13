@@ -1,5 +1,6 @@
+import { cached, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -25,6 +26,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 		body: body === undefined ? undefined : JSON.stringify(body)
 	});
 	if (response.status === 401) {
+		clearTaskCache();
 		const next = location.pathname.slice(base.length) + location.search;
 		location.assign(`${base}/signin?next=${encodeURIComponent(next || '/')}`);
 		throw new ApiError(401, 'Sign in with GitHub to continue.');
@@ -52,7 +54,9 @@ interface Overview {
 
 export const api = {
 	async me(): Promise<Me> {
-		session.me = await request<Me>('GET', '/api/me');
+		const me = await request<Me>('GET', '/api/me');
+		if (session.me.login && me.login !== session.me.login) clearTaskCache();
+		session.me = me;
 		return session.me;
 	},
 	/** Shared for a few seconds, so the layout and the overview page make one request. */
@@ -67,8 +71,8 @@ export const api = {
 		}
 		return overviewCache.promise;
 	},
-	async target(owner: string, repo: string): Promise<{ target: Target; tasks: Task[]; issues: IssueIntent[]; runs: ActionsRun[] }> {
-		const result = await request<{ target: Target; tasks: Task[]; issues: IssueIntent[]; runs: ActionsRun[] }>('GET', `/api/targets/${path(owner, repo)}`);
+	async target(owner: string, repo: string): Promise<TargetView> {
+		const result = await request<TargetView>('GET', `/api/targets/${path(owner, repo)}`);
 		remember({ profiles: result.target.profiles });
 		return result;
 	},
@@ -78,12 +82,29 @@ export const api = {
 		return result;
 	},
     /** An issue-addressed view does not need an enrolled task. */
-    issue: (owner: string, repo: string, issue: number) => request<{ issue: IssueIntent; target: Target; issueWriter: boolean }>('GET', `/api/repos/${path(owner, repo)}/issues/${issue}`),
+    issue: (owner: string, repo: string, issue: number) => request<{ issue: IssueIntent; target?: Target; issueWriter: boolean }>('GET', `/api/repos/${path(owner, repo)}/issues/${issue}`),
+	/** Summary reads survive navigation and refresh in the background when stale. */
+	taskSummary(owner: string, repo: string, issue: number) {
+		return cached(`task:${path(owner, repo, issue)}`, async () => {
+			const result = await request<TaskView>('GET', `/api/tasks/${path(owner, repo, issue)}/sections/summary`);
+			remember({ profiles: result.target.profiles });
+			return result;
+		});
+	},
+	/** Fetch only the selected phase, timeline or live PR data. */
+	taskSection(task: Task, section: TaskSection) {
+		const key = path(task.owner, task.repo, task.issue);
+		return cached(`section:${key}:${section}`, () =>
+			request<{ task: Task }>('GET', `/api/tasks/${key}/sections/${section}`), task.revision ?? task.updatedAt);
+	},
 	turns: (owner: string, repo: string, issue: number) =>
 		request<{ task: Task; turns: Turn[]; profiles?: ModelProfile[] }>('GET', `/api/tasks/${path(owner, repo, issue)}/turns`).then((result) => {
 			remember({ profiles: result.profiles });
 			return result;
 		}),
+	/** Load jobs only when the selected turn's Runner tab is opened. */
+	turnRuns: (owner: string, repo: string, issue: number, identifier: string) =>
+		request<TurnRuns>('GET', `/api/tasks/${path(owner, repo, issue)}/turns/${encodeURIComponent(identifier)}/runs`),
 	async credentials(): Promise<{ routes: CredentialRoute[]; targets: Target[]; usage: UsageRow[] }> {
 		const [result, overview] = await Promise.all([
 			request<{ routes: CredentialRoute[]; usage: UsageRow[] }>('GET', '/api/me/credentials'),
@@ -105,6 +126,7 @@ export const actions = {
 	async command(task: IssueRef, command: Command, arg = ''): Promise<string> {
 		const argument = (['approve', 'retry', 'sponsor', 'withdraw'].includes(command)) && arg ? arg : undefined;
 		const result = await request<{ posted: string; actor: string }>('POST', `/api/repos/${path(task.owner, task.repo)}/issues/${task.issue}/commands`, { command, argument });
+		clearTaskCache();
 		overviewCache = null;
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
@@ -116,6 +138,7 @@ export const actions = {
 	},
 	async signOut(): Promise<{ remote: string }> {
         const result = await request<{ remote: string }>('POST', '/auth/logout');
+        clearTaskCache();
         overviewCache = null;
         session.me = { login: '', name: '' };
         session.targets = []; session.tasks = []; session.profiles = {};

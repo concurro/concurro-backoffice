@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { ArrowLeftRight, GitBranch, GitPullRequest, Lock, PlayCircle } from 'lucide-svelte';
 	import IssueIntents from '#lib/components/IssueIntents.svelte';
+	import Alert from '#lib/components/Alert.svelte';
+	import Avatar from '#lib/components/Avatar.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import CodeBlock from '#lib/components/CodeBlock.svelte';
 	import DataTable from '#lib/components/DataTable.svelte';
@@ -40,7 +42,7 @@
 {#await data.result}
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
-{:then { target, tasks, runs, issues }}
+{:then { target, tasks, runs, runsMessage, issues }}
 	{@const prs = tasks.filter((t) => t.pr)}
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
 		<span class="pair">
@@ -128,22 +130,38 @@
 			</Panel>
 		{:else if tab === 'runs'}
 			<Panel flush title="Actions runs on the fork" meta={String(runs.length)}>
+				{#if runsMessage && runs.length}
+					<div class="notice"><Alert tone="warning" title="Some runs are missing">{runsMessage}</Alert></div>
+				{/if}
 				{#if runs.length}
 					<DataTable label="Actions runs">
 						<thead><tr><th>Run</th><th>Agent turn</th><th>Status</th><th>Task</th><th class="r">Started</th><th class="r">Duration</th></tr></thead>
 						<tbody>
 							{#each runs as run (run.id)}
 								<tr>
-									<td class="mono nowrap">{run.id}</td>
-									<td class="title"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}/turns/${run.turn}`)}>{run.title}</a></td>
+									<td class="mono nowrap">
+										{run.id}{#if run.attempt && run.attempt > 1}<span class="muted"> ·{run.attempt}</span>{/if}
+									</td>
+									<td class="title">
+										{#if run.task && run.turn}
+											<a href={`${taskHref(run.task)}/turns/${run.turn}`}>{run.title}</a>
+										{:else}
+											<span class="muted">{run.title}</span>
+										{/if}
+										{#if run.association === 'dispatched'}<span class="hint">dispatched only</span>{/if}
+									</td>
 									<td><Badge tone={runTone[run.status]}>{run.status}</Badge></td>
-									<td class="mono nowrap"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}`)}>#{run.issue}</a></td>
+									<td class="mono nowrap">
+										{#if run.task}<a href={taskHref(run.task)}>{run.task.repo}#{run.task.issue}</a>{:else}<span class="muted">—</span>{/if}
+									</td>
 									<td class="r nowrap muted">{relTime(run.startedAt)}</td>
 									<td class="r nowrap">{duration(run.durationS * 1000)}</td>
 								</tr>
 							{/each}
 						</tbody>
 					</DataTable>
+				{:else if runsMessage}
+					<EmptyState icon={PlayCircle} title="Runs unavailable" text={runsMessage} />
 				{:else}
 					<EmptyState icon={PlayCircle} title="No runs yet" text="Each agent turn executes as a GitHub Actions run on the fork." />
 				{/if}
@@ -173,6 +191,19 @@
 {/await}
 
 <style>
+	.notice {
+		padding: var(--s-3) var(--s-4) 0;
+	}
+	.hint {
+		margin-left: var(--s-2);
+		padding: 0 6px;
+		border: 1px solid var(--border);
+		border-radius: var(--r-full);
+		color: var(--text-3);
+		font-size: var(--fs-2xs);
+		line-height: 17px;
+		white-space: nowrap;
+	}
 	.pair,
 	.branch {
 		display: inline-flex;

@@ -5,14 +5,14 @@
 	import Alert from './Alert.svelte';
 	import Button from './Button.svelte';
 
-	let { error }: { error: unknown } = $props();
+	let { error, retry = () => refreshAll() }: { error: unknown; retry?: () => void } = $props();
 	const message = $derived(error instanceof Error ? error.message : 'The request failed.');
 </script>
 
 <Alert tone="caution" title="This view could not be loaded">
 	{message}
 	{#snippet actions()}
-		<Button size="sm" icon={RefreshCw} onclick={() => refreshAll()}>Retry</Button>
+		<Button size="sm" icon={RefreshCw} onclick={retry}>Retry</Button>
 		<Button size="sm" variant="ghost" href={withBase('/')}>Overview</Button>
 	{/snippet}
 </Alert>

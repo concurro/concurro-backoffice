@@ -38,7 +38,7 @@ export const api = {
 		delay(() => {
 			const target = findTarget(owner, repo);
 			const tasks = store.tasks.filter((t) => t.owner === owner && t.repo === repo);
-			return { target, tasks, issues: store.issues.filter((i) => i.owner === owner && i.repo === repo), runs: runsFor(tasks.map((t) => t.issue)) };
+			return { target, tasks, issues: store.issues.filter((i) => i.owner === owner && i.repo === repo), runs: runsFor(target, tasks.map((t) => t.issue)), runsMessage: null };
 		}),
 	task: (owner: string, repo: string, issue: number) =>
 		delay(() => ({ task: findTask(owner, repo, issue), target: findTarget(owner, repo), issueWriter: true })),

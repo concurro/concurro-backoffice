@@ -14,20 +14,41 @@
 	}
 	const i = (href: string, label: string, icon: IconType, mono = false): Item => ({ href, label, icon, mono });
 
-	const groups = $derived<{ label?: string; items: Item[] }[]>([
+	/** Owner groups retain the target order supplied by the API. */
+	const targetGroups = $derived.by(() => {
+		const owners = new Map<string, Item[]>();
+		for (const target of session.targets) {
+			const items = owners.get(target.owner) ?? [];
+			items.push(i(`/targets/${target.owner}/${target.repo}`, target.repo, TargetIcon, true));
+			owners.set(target.owner, items);
+		}
+		return [...owners];
+	});
+
+	const groups = $derived<{ label?: string; items: Item[]; targets?: typeof targetGroups }[]>([
 		{ items: [i('/', 'Overview', LayoutDashboard)] },
-		{ label: 'Targets', items: session.targets.map((t) => i(`/targets/${t.owner}/${t.repo}`, `${t.owner}/${t.repo}`, TargetIcon, true)) },
+		{ label: 'Targets', items: [], targets: targetGroups },
 		{ label: 'Me', items: [i('/me/credentials', 'My credentials', KeyRound), i('/me/sponsorships', 'My sponsorships', HandCoins)] },
 		{ label: 'Admin', items: [i('/admin', 'Operator', ServerCog), i('/styleguide', 'Styleguide', Palette)] }
 	]);
 
 	const path = $derived(appPath(page.url.pathname));
+	/** Match a navigation destination and its descendants on complete path segments. */
 	function active(href: string): boolean {
 		if (href === '/') return path === '/';
 		// A task belongs to its target's nav entry.
-		return path.startsWith(href) || path.startsWith(href.replace('/targets/', '/tasks/'));
+		return [href, href.replace('/targets/', '/tasks/')].some((route) => path === route || path.startsWith(`${route}/`));
 	}
 </script>
+
+<!-- Shared navigation link for ordinary items and grouped repositories. -->
+{#snippet navItem(item: Item, name: string)}
+	{@const Icon = item.icon}
+	<a href={withBase(item.href)} class="item" class:target={item.mono} class:active={active(item.href)} aria-label={name} aria-current={active(item.href) ? 'page' : undefined} title={ui.sidebarCollapsed || item.mono ? name : undefined} onclick={() => (ui.mobileNavOpen = false)}>
+		<Icon size={16} aria-hidden="true" />
+		<span class="label" class:mono={item.mono}>{item.label}</span>
+	</a>
+{/snippet}
 
 <nav class="sidebar" class:collapsed={ui.sidebarCollapsed} class:open={ui.mobileNavOpen} aria-label="Primary">
 	<a class="brand" href={withBase('/')} aria-label="Concurro overview">
@@ -41,13 +62,24 @@
 		{#each groups as group}
 			<div class="group">
 				{#if group.label}<p class="heading">{group.label}</p>{/if}
-				{#each group.items as item}
-					{@const Icon = item.icon}
-					<a href={withBase(item.href)} class="item" class:active={active(item.href)} aria-current={active(item.href) ? 'page' : undefined} title={ui.sidebarCollapsed ? item.label : undefined} onclick={() => (ui.mobileNavOpen = false)}>
-						<Icon size={16} aria-hidden="true" />
-						<span class="label" class:mono={item.mono}>{item.label}</span>
-					</a>
-				{/each}
+				{#if group.targets}
+					<ul class="owners">
+						{#each group.targets as [owner, items] (owner)}
+							<li>
+								<p class="owner-name" title={owner}>{owner}/</p>
+								<ul class="repos" aria-label={`${owner} repositories`}>
+									{#each items as item (item.href)}
+										<li>{@render navItem(item, `${owner}/${item.label}`)}</li>
+									{/each}
+								</ul>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					{#each group.items as item}
+						{@render navItem(item, item.label)}
+					{/each}
+				{/if}
 			</div>
 		{/each}
 	</div>
@@ -115,6 +147,46 @@
 		text-transform: uppercase;
 		white-space: nowrap;
 	}
+	.owners,
+	.repos {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		min-width: 0;
+	}
+	.owners {
+		display: grid;
+		gap: var(--s-2);
+	}
+	.owner-name {
+		padding: var(--s-1) 10px;
+		color: var(--text-3);
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		overflow-wrap: anywhere;
+	}
+	.repos {
+		margin-left: var(--s-3);
+		padding-left: var(--s-1);
+		border-left: 1px solid var(--border);
+	}
+	.item.target {
+		height: auto;
+		min-height: 32px;
+		padding-top: var(--s-1);
+		padding-bottom: var(--s-1);
+		white-space: normal;
+	}
+	.target .label {
+		min-width: 0;
+		overflow-wrap: anywhere;
+		overflow: visible;
+	}
+	.collapsed .repos {
+		margin-left: 0;
+		padding-left: 0;
+		border-left: 0;
+	}
 	.item {
 		display: flex;
 		align-items: center;
@@ -153,7 +225,8 @@
 	}
 	.collapsed .label,
 	.collapsed .name,
-	.collapsed .heading {
+	.collapsed .heading,
+	.collapsed .owner-name {
 		display: none;
 	}
 	.collapsed .group {
@@ -180,8 +253,14 @@
 		}
 		.sidebar .label,
 		.sidebar .name,
-		.sidebar .heading {
+		.sidebar .heading,
+		.sidebar .owner-name {
 			display: revert;
+		}
+		.sidebar .repos {
+			margin-left: var(--s-3);
+			padding-left: var(--s-1);
+			border-left: 1px solid var(--border);
 		}
 		.collapse {
 			display: none;

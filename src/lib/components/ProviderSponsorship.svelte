@@ -8,7 +8,7 @@
 	import Button from './Button.svelte';
 	import Panel from './Panel.svelte';
 
-	let { issue, projection, writer = false }: { issue: IssueRef; projection?: Sponsorship; writer?: boolean } = $props();
+	let { issue, projection, writer = false, refresh = invalidateAll }: { issue: IssueRef; projection?: Sponsorship; writer?: boolean; refresh?: () => unknown } = $props();
 	let busy = $state(false);
 	const providers: Provider[] = ['openai', 'anthropic'];
     const recovery = $derived(projection?.recovery);
@@ -28,7 +28,7 @@
 </script>
 
 <Panel title="Provider sponsorship" id="sponsorship">
-	<p class="notice">{#if projection?.funding === 'contributed'}This task uses each provider’s selected sponsor credentials, including authorized retries. Missing credentials pause new calls; there is no organization fallback.{:else if projection?.funding === 'org'}This task uses organization credentials. These provider grants are prospective consent for contributed funding, including authorized retries.{:else}Funding policy is unconfirmed. Sponsorship records your consent for this provider, including authorized retries; displayed consent alone does not prove a personal charge.{/if}</p>
+	<p class="notice">{#if projection?.scope === 'own'}This view shows only your provider consent. Full task details require upstream write access; you can still withdraw your own consent.{:else if projection?.funding === 'contributed'}This task uses each provider’s selected sponsor credentials, including authorized retries. Missing credentials pause new calls; there is no organization fallback.{:else if projection?.funding === 'org'}This task uses organization credentials. These provider grants are prospective consent for contributed funding, including authorized retries.{:else}Funding policy is unconfirmed. Sponsorship records your consent for this provider, including authorized retries; displayed consent alone does not prove a personal charge.{/if}</p>
     {#if projection?.calls !== undefined}<p class="state">Charged attempts: <strong>{projection.calls}</strong>. Recorded debits keep their original owner and version; token observations below are supplementary.</p>{/if}
     {#if projection?.task_stage === 'awaiting_credentials'}
         <p class="notice"><strong>{scheduled ? 'Automatic recovery scheduled' : recovery?.eligible ? 'Waiting for credentials' : 'Writer action required'}</strong> · {#if projection.recovery?.status}{projection.recovery.status}.{' '}{/if}{#if scheduled && recovery?.delivery}Retry no earlier than {new Date(recovery.delivery.due_at * 1000).toLocaleString()}. Current consent, all required coverage, authority and remaining budget will be checked first.{:else if recovery?.eligible}{#if recovery.delivery && recovery.delivery.id === recovery.consumed}Waiting for newly validated credentials or writer action.{:else}Waiting for validated credentials for all required provider routes.{/if} Auth or quota pauses need a newly validated replacement version; the same token can be supplied again if capacity has returned.{:else}This pause has no eligible automatic retry; a writer must correct or reassess it.{/if} <a href={withBase('/me/credentials')}>Manage my credentials</a></p>
@@ -61,7 +61,8 @@
 	{#if projection?.observations?.length}
         <details><summary>Gateway request evidence</summary><ul>{#each projection.observations as event}<li>{event.binding.sponsorship_provider} · owner {event.binding.sponsor} · credential version {event.binding.credential_version} · {event.source ?? 'gateway'} · {event.category ?? (event.source === 'provider' && event.completed ? 'provider completed' : 'request observed')} · {event.usage ? `${event.usage.input_tokens} input / ${event.usage.output_tokens} output tokens` : 'usage unknown'}</li>{/each}</ul></details>
     {/if}
-	<Button size="sm" onclick={() => invalidateAll()} disabled={busy}>Refresh sponsorship</Button>
+    {#if projection?.scope === 'own' && projection.history?.length}<details><summary>Your consent receipts</summary><ul>{#each projection.history as row}<li>{row.provider} · {row.reason}{#if row.cutoff !== undefined && row.cutoff !== null} · withdrawn through sponsorship revision {row.cutoff}{/if}</li>{/each}</ul></details>{/if}
+	<Button size="sm" onclick={refresh} disabled={busy}>Refresh sponsorship</Button>
 </Panel>
 
 <style>

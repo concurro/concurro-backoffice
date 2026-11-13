@@ -109,7 +109,7 @@ const base = [
 ];
 
 export const targets: Target[] = base.map(({ calls, ...t }) => ({
-    writer: true,
+	writer: users.find((u) => u.login === ME)!.writer,
     credentialRequirements: t.roster.map((entry) => ({ role: ({plan_reviewer: 'plan_reviewers', pr_reviewer: 'pr_reviewers'} as Record<string,string>)[entry.role] ?? entry.role, profile: entry.profile, model: profile(entry.profile).model, provider: profile(entry.profile).provider, route: profile(entry.profile).provider === 'openai' ? 'openai-api-key' : 'anthropic-api-key' })),
 	...t,
 	defaultBranch: 'main',
