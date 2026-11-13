@@ -1,7 +1,8 @@
+import { cached, clearTaskCache } from './cache.svelte.ts';
 import { api as fixtures } from '#lib/mock/api.ts';
 import { ME, profiles, users } from '#lib/mock/reference.ts';
 import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialRouteId, Task, TurnRuns } from '#lib/types.ts';
+import type { Command, CredentialRouteId, Task, TaskSection, TurnRuns } from '#lib/types.ts';
 import { remember, session } from './session.svelte.ts';
 
 /** The original mockup: fixtures served with an artificial delay, commands applied to in-browser state. */
@@ -19,6 +20,25 @@ export const api = {
 	},
 	target: fixtures.target,
 	task: fixtures.task,
+	/** Exercise the same independently loaded page sections with fixture data. */
+	taskSummary(owner: string, repo: string, issue: number) {
+		return cached(`task:${owner}/${repo}/${issue}`, async () => {
+			const view = await fixtures.task(owner, repo, issue);
+			const t = view.task;
+			return { ...view, task: { ...t, body: undefined,
+				phaseRecords: [!!t.intake.length, !!t.plans.length, !!t.designReview.length, !!t.pr, !!t.rounds.length, false],
+				currentPlan: t.plans.at(-1), intake: [], plans: [], designReview: [], rounds: [], findings: [], timeline: [],
+				pr: t.pr ? { ...t.pr, ci: 'unknown' as const, additions: null, deletions: null } : undefined
+			} };
+		});
+	},
+	/** Cache selected fixture sections just like live responses. */
+	taskSection(task: Task, section: TaskSection) {
+		return cached(`section:${task.owner}/${task.repo}/${task.issue}:${section}`, async () => {
+			const view = await fixtures.task(task.owner, task.repo, task.issue);
+			return { task: view.task };
+		}, task.updatedAt);
+	},
 	turns: fixtures.turns,
 	/** Project the fixture's runner into the same shape as live Actions evidence. */
 	async turnRuns(owner: string, repo: string, issue: number, identifier: string): Promise<TurnRuns> {
@@ -40,7 +60,13 @@ export const api = {
 };
 
 export const actions = {
-	command: async (task: Task, command: Command, arg = '') => runCommand(task, command, arg),
+	/** Apply fixture commands to the full task, then invalidate projected views. */
+	async command(task: Task, command: Command, arg = '') {
+		const view = await fixtures.task(task.owner, task.repo, task.issue);
+		const message = runCommand(view.task, command, arg);
+		clearTaskCache();
+		return message;
+	},
 	async saveCredential(id: CredentialRouteId, secret: string) {
 		saveCredential(id, secret);
 		return store.credentials.find((c) => c.id === id)!;
@@ -49,5 +75,5 @@ export const actions = {
 		revokeCredential(id);
 		return store.credentials.find((c) => c.id === id)!;
 	},
-	signOut: async () => undefined
+	signOut: async () => clearTaskCache()
 };

@@ -21,7 +21,7 @@ export type Role = 'triage' | 'planner' | 'plan_reviewer' | 'implementer' | 'pr_
 export type Provider = 'anthropic' | 'openai';
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 export type AlertTone = 'note' | 'tip' | 'warning' | 'caution';
-export type CiStatus = 'passing' | 'failing' | 'pending' | 'none';
+export type CiStatus = 'passing' | 'failing' | 'pending' | 'none' | 'unknown';
 export type Command = 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor';
 
 export interface ModelProfile {
@@ -174,7 +174,24 @@ export interface TaskCompletion {
 	at: string;
 }
 
+/** Independently loaded issue-page content. */
+export type TaskSection = 'intake' | 'plan' | 'design' | 'implement' | 'review' | 'handoff' | 'timeline' | 'pull';
+
+/** Issue summary and target configuration used by the page shell. */
+export interface TaskView {
+	/** Lightweight task metadata. */
+	task: Task;
+	/** Target metadata and model profiles. */
+	target: Target;
+}
+
 export interface Task {
+	/** Checkpoint and issue revision used to separate cached phase responses. */
+	revision?: string;
+	/** Recorded work in each step, independent of loaded phase bodies. */
+	phaseRecords?: boolean[];
+	/** Current approval identity, available before the plan body is fetched. */
+	currentPlan?: Pick<PlanVersion, 'id'> & Partial<Pick<PlanVersion, 'version' | 'summary'>>;
 	owner: string;
 	repo: string;
 	issue: number;

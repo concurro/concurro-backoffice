@@ -18,7 +18,7 @@
 		<details open={i === 0}>
 			<summary>
 				<span class="gen">Generation {gen.generation}</span>
-				<span class="muted">plan v{version(gen.planId)} <span class="mono">{gen.planId}</span> · {relTime(gen.at)}</span>
+				<span class="muted">{#if version(gen.planId)}plan v{version(gen.planId)}{' '}{/if}<span class="mono">{gen.planId}</span> · {relTime(gen.at)}</span>
 				<span class="verdicts">
 					{#each gen.reviews as r}<Badge plain meta={verdictMeta[r.verdict]} title="{r.agent}: {verdictMeta[r.verdict].label}"><span class="sr-only">{r.agent}: {verdictMeta[r.verdict].label}</span></Badge>{/each}
 				</span>

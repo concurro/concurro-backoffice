@@ -1,5 +1,6 @@
+import { cached, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -25,6 +26,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 		body: body === undefined ? undefined : JSON.stringify(body)
 	});
 	if (response.status === 401) {
+		clearTaskCache();
 		const next = location.pathname.slice(base.length) + location.search;
 		location.assign(`${base}/signin?next=${encodeURIComponent(next || '/')}`);
 		throw new ApiError(401, 'Sign in with GitHub to continue.');
@@ -51,7 +53,9 @@ interface Overview {
 
 export const api = {
 	async me(): Promise<Me> {
-		session.me = await request<Me>('GET', '/api/me');
+		const me = await request<Me>('GET', '/api/me');
+		if (session.me.login && me.login !== session.me.login) clearTaskCache();
+		session.me = me;
 		return session.me;
 	},
 	/** Shared for a few seconds, so the layout and the overview page make one request. */
@@ -75,6 +79,20 @@ export const api = {
 		const result = await request<{ task: Task; target: Target }>('GET', `/api/tasks/${path(owner, repo, issue)}`);
 		remember({ profiles: result.target.profiles });
 		return result;
+	},
+	/** Summary reads survive navigation and refresh in the background when stale. */
+	taskSummary(owner: string, repo: string, issue: number) {
+		return cached(`task:${path(owner, repo, issue)}`, async () => {
+			const result = await request<TaskView>('GET', `/api/tasks/${path(owner, repo, issue)}/sections/summary`);
+			remember({ profiles: result.target.profiles });
+			return result;
+		});
+	},
+	/** Fetch only the selected phase, timeline or live PR data. */
+	taskSection(task: Task, section: TaskSection) {
+		const key = path(task.owner, task.repo, task.issue);
+		return cached(`section:${key}:${section}`, () =>
+			request<{ task: Task }>('GET', `/api/tasks/${key}/sections/${section}`), task.revision ?? task.updatedAt);
 	},
 	turns: (owner: string, repo: string, issue: number) =>
 		request<{ task: Task; turns: Turn[]; profiles?: ModelProfile[] }>('GET', `/api/tasks/${path(owner, repo, issue)}/turns`).then((result) => {
@@ -105,6 +123,8 @@ export const actions = {
 	async command(task: Task, command: Command, arg = ''): Promise<string> {
 		const argument = (command === 'approve' || command === 'retry') && arg ? arg : undefined;
 		const result = await request<{ posted: string; actor: string }>('POST', `/api/tasks/${path(task.owner, task.repo, task.issue)}/commands`, { command, argument });
+		clearTaskCache();
+		overviewCache = null;
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
 	async saveCredential(id: CredentialRouteId, secret: string): Promise<CredentialRoute> {
@@ -114,6 +134,8 @@ export const actions = {
 		return request<CredentialRoute>('DELETE', `/api/me/credentials/${id}`);
 	},
 	async signOut(): Promise<void> {
+		clearTaskCache();
+		overviewCache = null;
 		await request('POST', '/auth/logout').catch(() => undefined);
 	}
 };
