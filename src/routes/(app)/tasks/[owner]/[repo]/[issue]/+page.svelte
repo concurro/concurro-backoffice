@@ -22,10 +22,12 @@
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
 	import { issueUrl, relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { ciMeta, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
-	import { session } from '#lib/api/index.ts';
+	import type { TaskSection } from '#lib/types.ts';
+	import { api, session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
@@ -33,6 +35,27 @@
 
 	/** The step whose details are shown, from `?phase=`; defaults to where the task is. */
 	const picked = $derived(steps.findIndex((s) => s.key === page.url.searchParams.get('phase')));
+	const summary = $derived(data.resource.value?.task);
+	const phase = $derived(picked >= 0 ? picked : Math.max(stepIndex(summary?.atStage ?? 'intake'), 0));
+	const phaseData = $derived(summary && phase !== 3 ? api.taskSection(summary, steps[phase].key as TaskSection) : undefined);
+	const timelineData = $derived(summary ? api.taskSection(summary, 'timeline') : undefined);
+	const pullData = $derived(summary?.pr ? api.taskSection(summary, 'pull') : undefined);
+	const livePull = $derived(pullData?.value?.task);
+	const task = $derived(summary ? { ...summary, pr: livePull?.revision === summary.revision ? livePull?.pr ?? summary.pr : summary.pr } : undefined);
+	const phaseTask = $derived(phase === 3 ? task : task && phaseData?.value?.task.revision === summary?.revision && phaseData?.value
+		? { ...phaseData.value.task, pr: task.pr } : undefined);
+	const timelineTask = $derived(timelineData?.value?.task.revision === summary?.revision ? timelineData?.value?.task : undefined);
+	const ciLoading = $derived(!!pullData?.loading && !pullData.value);
+	let refreshingRevision = '';
+	$effect(() => {
+		const changed = [phaseData?.value?.task, timelineData?.value?.task, livePull]
+			.find((value) => value?.revision && value.revision !== summary?.revision);
+		if (changed && !data.resource.loading && refreshingRevision !== `${summary?.revision}:${changed.revision}` && untrack(data.resource.refresh)) {
+			refreshingRevision = `${summary?.revision}:${changed.revision}`;
+		}
+	});
+
+	/** Select a phase without reloading the issue summary. */
 	function select(step: number) {
 		const url = new URL(page.url.href);
 		url.searchParams.set('phase', steps[step].key);
@@ -42,7 +65,9 @@
 
 <svelte:head><title>{params.repo}#{params.issue} · Concurro</title></svelte:head>
 
-{#await data.result}
+{#if !task && data.resource.error}
+	<ErrorState error={data.resource.error} retry={data.resource.refresh} />
+{:else if !task}
 	<Skeleton rows={2} />
 	<Skeleton height={62} />
 	<Skeleton height={64} />
@@ -50,9 +75,9 @@
 		<div class="col"><Panel title="Plan"><Skeleton rows={8} /></Panel><Panel title="Design review"><Skeleton rows={4} /></Panel></div>
 		<div class="col"><Panel title="Readiness"><Skeleton rows={4} /></Panel><Panel title="Budgets"><Skeleton rows={3} /></Panel></div>
 	</div>
-{:then { task }}
+{:else}
 	{@const turns = `${taskHref(task)}/turns`}
-	{@const phase = picked >= 0 ? picked : Math.max(stepIndex(task.atStage), 0)}
+	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<PageHeader title={task.title}>
 		{#snippet eyebrow()}
 			<a class="mono" href={targetHref(task)}>{task.owner}/{task.repo}</a>
@@ -75,12 +100,13 @@
 					<span class="num diffstat"><span class="add">+{task.pr.additions}</span> <span class="del">−{task.pr.deletions}</span></span>
 				{/if}
 			</span>
-			<Badge plain meta={ciMeta[task.pr.ci]} />
+			{#if ciLoading}<span class="muted">Loading CI…</span>{:else}<Badge plain meta={ciMeta[task.pr.ci]} />{/if}
 		{/if}
 		{#each task.labels as label}<span class="label">{label}</span>{/each}
 		<span class="muted updated">Updated {relTime(task.updatedAt)}</span>
 	</PageHeader>
 
+	{#if pullData?.error}<ErrorState error={pullData.error} retry={pullData.refresh} />{/if}
 	<StageStepper {task} selected={phase} onselect={select} />
 
 	<Alert tone={task.alert.tone} title={task.alert.title}>
@@ -93,20 +119,23 @@
 
 	<div class="grid">
 		<div class="col" role="region" aria-label="{steps[phase].label} details">
-			{#if phase === 0}
-				<IntakePanel {task} />
-			{:else if phase === 1}
-				<PlanPanel {task} />
-			{:else if phase === 2}
-				<DesignReviewPanel {task} />
-			{:else if phase === 3}
-				<ImplementPanel {task} {turns} />
-			{:else if phase === 4}
-				<PrReviewPanel {task} />
-			{:else}
-				{#if task.completion}<CompletionPanel completion={task.completion} />{/if}
-				<ReadinessPanel {task} />
-			{/if}
+			{#if phaseData?.error}<ErrorState error={phaseData.error} retry={phaseData.refresh} />{/if}
+			{#if phaseTask}
+				{#if phase === 0}
+					<IntakePanel task={phaseTask} />
+				{:else if phase === 1}
+					<PlanPanel task={phaseTask} />
+				{:else if phase === 2}
+					<DesignReviewPanel task={phaseTask} />
+				{:else if phase === 3}
+					<ImplementPanel task={phaseTask} {turns} {ciLoading} />
+				{:else if phase === 4}
+					<PrReviewPanel task={phaseTask} />
+				{:else}
+					{#if phaseTask.completion}<CompletionPanel completion={phaseTask.completion} />{/if}
+					<ReadinessPanel task={phaseTask} {ciLoading} />
+				{/if}
+			{:else if !phaseData?.error}<Skeleton rows={6} />{/if}
 		</div>
 		<div class="col">
 			<Panel title="Budgets" id="budgets">
@@ -132,16 +161,17 @@
 					<p class="muted">No sponsor. Model calls use the target’s shared credentials. A writer can run <code>/concurro sponsor</code> to pay with their own.</p>
 				{/if}
 			</Panel>
-			<Panel title="Timeline" meta={String(task.timeline.length)} id="timeline">
-				<Timeline events={task.timeline} turnHref={(n) => `${turns}/${n}`} />
+			<Panel title="Timeline" meta={timelineTask ? String(timelineTask.timeline.length) : undefined} id="timeline">
+				{#if timelineData?.error}<ErrorState error={timelineData.error} retry={timelineData.refresh} />{/if}
+				{#if timelineTask}
+					<Timeline events={timelineTask.timeline} turnHref={(n) => `${turns}/${n}`} />
+				{:else if !timelineData?.error}<Skeleton rows={4} />{/if}
 			</Panel>
 		</div>
 	</div>
 
-	<CommandBar {task} />
-{:catch error}
-	<ErrorState {error} />
-{/await}
+	<CommandBar task={{ ...task, plans: phaseTask?.plans ?? task.plans }} />
+{/if}
 
 <style>
 	.grid {

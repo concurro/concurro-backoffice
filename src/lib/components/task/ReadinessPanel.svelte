@@ -4,7 +4,7 @@
 	import type { Task } from '#lib/types.ts';
 	import Panel from '../Panel.svelte';
 
-	let { task }: { task: Task } = $props();
+	let { task, ciLoading = false }: { task: Task; /** Live CI is still being fetched. */ ciLoading?: boolean } = $props();
 
 	type State = 'ok' | 'no' | 'pending';
 	const checks = $derived.by((): { label: string; detail: string; state: State }[] => {
@@ -19,7 +19,7 @@
 		return [
 			{ label: 'All reviewers approve the current head', detail: `${approvals}/${votes.length} on ${pr.headSha}`, state: votes.length && approvals === votes.length ? 'ok' : 'no' },
 			{ label: 'No open findings', detail: open ? `${open} open` : 'None open', state: open ? 'no' : 'ok' },
-			{ label: 'CI is green', detail: pr.ci, state: pr.ci === 'passing' ? 'ok' : pr.ci === 'failing' ? 'no' : 'pending' },
+			{ label: 'CI is green', detail: ciLoading ? 'Loading CI…' : pr.ci, state: pr.ci === 'passing' ? 'ok' : pr.ci === 'failing' ? 'no' : 'pending' },
 			{ label: 'Marked ready for humans', detail: pr.ready ? `PR #${pr.number} is ready for review` : 'Still a draft', state: pr.ready ? 'ok' : 'pending' }
 		];
 	});
