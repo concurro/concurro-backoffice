@@ -93,7 +93,8 @@ export interface IntakeRound {
 export interface Objection {
 	id: string;
 	text: string;
-	resolved: boolean;
+	/** Absent on an archived generation: historical concern text, with no current ledger status. */
+	resolved?: boolean;
 }
 
 export interface DesignReview {
@@ -106,7 +107,10 @@ export interface DesignReview {
 export interface DesignReviewGeneration {
 	generation: number;
 	planId: string;
+	/** Empty when the engine recorded no time for this generation. */
 	at: string;
+	/** Why this generation was invalidated; empty for the current one. */
+	reason?: string;
 	reviews: DesignReview[];
 }
 

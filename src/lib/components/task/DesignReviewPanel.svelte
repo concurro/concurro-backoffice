@@ -18,11 +18,12 @@
 		<details open={i === 0}>
 			<summary>
 				<span class="gen">Generation {gen.generation}</span>
-				<span class="muted">plan v{version(gen.planId)} <span class="mono">{gen.planId}</span> · {relTime(gen.at)}</span>
+				<span class="muted">plan v{version(gen.planId)} <span class="mono">{gen.planId}</span>{#if gen.at} · {relTime(gen.at)}{/if}</span>
 				<span class="verdicts">
 					{#each gen.reviews as r}<Badge plain meta={verdictMeta[r.verdict]} title="{r.agent}: {verdictMeta[r.verdict].label}"><span class="sr-only">{r.agent}: {verdictMeta[r.verdict].label}</span></Badge>{/each}
 				</span>
 			</summary>
+			{#if gen.reason}<p class="reason"><Inline text={gen.reason} /></p>{/if}
 			<div class="reviews">
 				{#each gen.reviews as r}
 					<article>
@@ -35,14 +36,23 @@
 							<ul>
 								{#each r.objections as o (o.id)}
 									<li>
-										<span class="mono oid">{o.id}</span>
+										{#if o.resolved === undefined}
+											<!-- An archived concern has no ledger identifier to show. -->
+											<span class="bullet" aria-hidden="true">•</span>
+										{:else}
+											<span class="mono oid">{o.id}</span>
+										{/if}
 										<span class="otext"><Inline text={o.text} /></span>
-										<Badge plain tone={o.resolved ? 'success' : 'warning'}>{o.resolved ? 'Resolved' : 'Open'}</Badge>
+										{#if o.resolved !== undefined}
+											<Badge plain tone={o.resolved ? 'success' : 'warning'}>{o.resolved ? 'Resolved' : 'Open'}</Badge>
+										{/if}
 									</li>
 								{/each}
 							</ul>
 						{:else}
-							<p class="none muted">{r.verdict === 'pending' ? 'Review has not finished.' : 'No objections.'}</p>
+							<p class="none muted">
+								{r.verdict === 'pending' ? 'Review has not finished.' : r.verdict === 'approve' ? 'No objections.' : 'No concerns were recorded.'}
+							</p>
 						{/if}
 					</article>
 				{/each}
@@ -79,6 +89,12 @@
 		display: inline-flex;
 		gap: var(--s-2);
 		margin-left: auto;
+	}
+	.reason {
+		margin: 0;
+		padding: 0 var(--s-4) var(--s-2);
+		color: var(--text-2);
+		font-size: var(--fs-sm);
 	}
 	.reviews {
 		display: grid;
@@ -123,6 +139,10 @@
 	}
 	li:last-child {
 		border-bottom: 0;
+	}
+	.bullet {
+		color: var(--text-3);
+		line-height: 1.5;
 	}
 	.oid {
 		color: var(--text-3);
