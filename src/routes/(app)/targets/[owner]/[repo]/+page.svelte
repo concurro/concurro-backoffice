@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowLeftRight, GitBranch, GitPullRequest, Lock, PlayCircle } from 'lucide-svelte';
+	import Alert from '#lib/components/Alert.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import CodeBlock from '#lib/components/CodeBlock.svelte';
@@ -127,6 +128,9 @@
 			</Panel>
 		{:else if tab === 'runs'}
 			<Panel flush title="Actions runs on the fork" meta={String(runs.length)}>
+				{#if runsMessage && runs.length}
+					<div class="notice"><Alert tone="warning" title="Some runs are missing">{runsMessage}</Alert></div>
+				{/if}
 				{#if runs.length}
 					<DataTable label="Actions runs">
 						<thead><tr><th>Run</th><th>Agent turn</th><th>Status</th><th>Task</th><th class="r">Started</th><th class="r">Duration</th></tr></thead>
@@ -185,6 +189,9 @@
 {/await}
 
 <style>
+	.notice {
+		padding: var(--s-3) var(--s-4) 0;
+	}
 	.hint {
 		margin-left: var(--s-2);
 		padding: 0 6px;
