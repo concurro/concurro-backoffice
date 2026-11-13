@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ExternalLink, GitPullRequest, SquareTerminal } from 'lucide-svelte';
 	import Alert from '#lib/components/Alert.svelte';
+	import ProviderSponsorship from '#lib/components/ProviderSponsorship.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import Button from '#lib/components/Button.svelte';
@@ -22,14 +23,12 @@
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { ciMeta, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
-	import { session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
-	const name = (login: string) => (login === session.me.login ? session.me.name : login);
 
 	/** The step whose details are shown, from `?phase=`; defaults to where the task is. */
 	const picked = $derived(steps.findIndex((s) => s.key === page.url.searchParams.get('phase')));
@@ -50,7 +49,7 @@
 		<div class="col"><Panel title="Plan"><Skeleton rows={8} /></Panel><Panel title="Design review"><Skeleton rows={4} /></Panel></div>
 		<div class="col"><Panel title="Readiness"><Skeleton rows={4} /></Panel><Panel title="Budgets"><Skeleton rows={3} /></Panel></div>
 	</div>
-{:then { task }}
+{:then { task, issueWriter }}
 	{@const turns = `${taskHref(task)}/turns`}
 	{@const phase = picked >= 0 ? picked : Math.max(stepIndex(task.atStage), 0)}
 	<PageHeader title={task.title}>
@@ -116,22 +115,7 @@
 					<Meter label="Plan revisions" {...task.budgets.planRevisions} />
 				</div>
 			</Panel>
-			<Panel title="Sponsor" id="sponsor">
-				{#if task.sponsor}
-					<div class="sponsor">
-						<Avatar login={task.sponsor} size={32} />
-						<div>
-							<p class="sponsor-name">{name(task.sponsor)}{#if task.sponsor === session.me.login}<span class="you">you</span>{/if}</p>
-							<p class="muted">@{task.sponsor} pays for this task’s model calls</p>
-						</div>
-					</div>
-					{#if task.paused}
-						<p class="paused tone-danger"><strong>awaiting_credentials</strong> {task.pauseReason}</p>
-					{/if}
-				{:else}
-					<p class="muted">No sponsor. Model calls use the target’s shared credentials. A writer can run <code>/concurro sponsor</code> to pay with their own.</p>
-				{/if}
-			</Panel>
+			<ProviderSponsorship issue={task} projection={task.sponsorships} writer={issueWriter} />
 			<Panel title="Timeline" meta={String(task.timeline.length)} id="timeline">
 				<Timeline events={task.timeline} turnHref={(n) => `${turns}/${n}`} />
 			</Panel>
@@ -192,43 +176,6 @@
 	.meters {
 		display: grid;
 		gap: var(--s-4);
-	}
-	.sponsor {
-		display: flex;
-		align-items: center;
-		gap: var(--s-3);
-		font-size: var(--fs-sm);
-	}
-	.sponsor-name {
-		font-weight: var(--fw-medium);
-	}
-	.you {
-		margin-left: var(--s-2);
-		padding: 0 6px;
-		border-radius: var(--r-full);
-		background: var(--accent-soft);
-		color: var(--accent-text);
-		font-size: var(--fs-2xs);
-	}
-	.paused {
-		margin-top: var(--s-3);
-		padding: var(--s-2) var(--s-3);
-		border: 1px solid var(--tone-border);
-		border-radius: var(--r-md);
-		background: var(--tone-bg);
-		color: var(--text-2);
-		font-size: var(--fs-sm);
-	}
-	.paused strong {
-		display: block;
-		color: var(--tone-fg);
-		font-family: var(--font-mono);
-		font-size: var(--fs-xs);
-	}
-	code {
-		padding: 1px 4px;
-		border-radius: var(--r-sm);
-		background: var(--surface-3);
 	}
 	@media (max-width: 1100px) {
 		.grid {

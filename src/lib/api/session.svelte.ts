@@ -1,6 +1,7 @@
 import type { ModelProfile, Target, Task } from '#lib/types.ts';
 
 export interface Me {
+	id?: number;
 	login: string;
 	name: string;
 	avatarUrl?: string;

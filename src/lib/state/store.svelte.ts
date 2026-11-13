@@ -1,10 +1,21 @@
 import { credentials } from '#lib/mock/account.ts';
-import { ME } from '#lib/mock/reference.ts';
+import { ME, MOCK_ACTOR_ID } from '#lib/mock/reference.ts';
 import { tasks } from '#lib/mock/tasks.ts';
-import type { Command, CredentialRouteId, Stage, Task } from '#lib/types.ts';
+import type { Command, CredentialRouteId, IssueIntent, IssueRef, Provider, Stage, Task } from '#lib/types.ts';
 
 /** In-browser mock state. Mutations stay local; nothing leaves the page. */
-export const store = $state({ tasks, credentials });
+for (const task of tasks) {
+    task.sponsorships = { funding: 'org', status: 'confirmed', slots: {
+        openai: { sponsor_id: task.sponsor === ME ? String(MOCK_ACTOR_ID) : '84', login: task.sponsor || 'jvoss', status: 'active', epoch: 1 },
+        anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active', epoch: 1 }
+    }};
+    if (task.paused) {
+        task.alert = { tone: 'note', title: 'Prospective coverage needs attention', body: 'The personal credential is unavailable. Current model calls remain org-funded.' };
+        task.stage = task.atStage;
+    }
+    task.paused = undefined; task.pauseReason = undefined;
+}
+export const store = $state({ tasks, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
 
 let seq = 0;
 const now = () => new Date().toISOString();
@@ -21,7 +32,20 @@ function move(task: Task, stage: Stage, title: string, body: string, tone: Task[
 }
 
 /** Applies a writer command to local mock state and returns the toast text. */
-export function runCommand(task: Task, command: Command, arg = ''): string {
+export function runCommand(issue: IssueRef, command: Command, arg = ''): string {
+    const item = [...store.tasks, ...store.issues].find((t) => t.owner === issue.owner && t.repo === issue.repo && t.issue === issue.issue);
+    if (!item) throw new Error('Issue is not visible.');
+    if (command === 'sponsor' || command === 'withdraw') {
+        if (!['openai', 'anthropic'].includes(arg)) return 'Usage: /concurro sponsor openai | anthropic';
+        const provider = arg as Provider;
+        item.sponsorships ??= { funding: 'org', status: 'confirmed', slots: {} };
+        const old = item.sponsorships.slots[provider];
+        if (command === 'sponsor') item.sponsorships.slots[provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
+        else if (old?.sponsor_id === String(MOCK_ACTOR_ID)) item.sponsorships.slots[provider] = { sponsor_id: null, status: 'withdrawn', epoch: (old.epoch ?? 0) + 1 };
+        return `Posted /concurro ${command} ${provider} for @${ME}. Current calls remain org-funded.`;
+    }
+    const task = store.tasks.find((t) => t === item);
+    if (!task) throw new Error('This demo issue is not enrolled.');
 	const ref = `${task.repo}#${task.issue}`;
 	switch (command) {
 		case 'start':
@@ -53,17 +77,15 @@ export function runCommand(task: Task, command: Command, arg = ''): string {
 			Object.assign(task, { plans: [], designReview: [], rounds: [], findings: [], approvedPlanId: undefined, paused: undefined });
 			move(task, 'intake', 'Invalidated: assessment restarts', 'Plans, design approvals and review state were discarded. Spent budgets are kept.', 'warning');
 			return `Invalidated ${ref}`;
-		case 'sponsor':
-			log(task, '`/concurro sponsor`');
-			task.sponsor = ME;
-			return `You now sponsor ${ref}`;
+
 	}
 }
 
 export function saveCredential(id: CredentialRouteId, secret: string) {
 	const route = store.credentials.find((c) => c.id === id)!;
+	if (!route.registrationAvailable) throw new Error('Subscription registration is not available.');
 	route.status = 'valid';
-	route.fingerprint = `${secret.slice(0, 3)}…${secret.slice(-4)}`;
+	route.fingerprint = 'sha256:mock-' + secret.length;
 	route.lastValidated = now();
 	route.note = undefined;
 }
@@ -71,5 +93,5 @@ export function saveCredential(id: CredentialRouteId, secret: string) {
 export function revokeCredential(id: CredentialRouteId) {
 	const route = store.credentials.find((c) => c.id === id)!;
 	route.status = 'revoked';
-	route.note = 'Revoked by you. Tasks that need this route will pause.';
+	route.note = 'Stored personal credential revoked. Current org-paid calls are unaffected.';
 }

@@ -1,5 +1,5 @@
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -45,6 +45,7 @@ let overviewCache: { at: number; promise: Promise<Overview> } | null = null;
 
 interface Overview {
 	tasks: Task[];
+	issues: IssueIntent[];
 	targets: Target[];
 	activity: ActivityItem[];
 }
@@ -66,16 +67,18 @@ export const api = {
 		}
 		return overviewCache.promise;
 	},
-	async target(owner: string, repo: string): Promise<{ target: Target; tasks: Task[]; runs: ActionsRun[] }> {
-		const result = await request<{ target: Target; tasks: Task[]; runs: ActionsRun[] }>('GET', `/api/targets/${path(owner, repo)}`);
+	async target(owner: string, repo: string): Promise<{ target: Target; tasks: Task[]; issues: IssueIntent[]; runs: ActionsRun[] }> {
+		const result = await request<{ target: Target; tasks: Task[]; issues: IssueIntent[]; runs: ActionsRun[] }>('GET', `/api/targets/${path(owner, repo)}`);
 		remember({ profiles: result.target.profiles });
 		return result;
 	},
-	async task(owner: string, repo: string, issue: number): Promise<{ task: Task; target: Target }> {
-		const result = await request<{ task: Task; target: Target }>('GET', `/api/tasks/${path(owner, repo, issue)}`);
+	async task(owner: string, repo: string, issue: number): Promise<{ task: Task; target: Target; issueWriter: boolean }> {
+		const result = await request<{ task: Task; target: Target; issueWriter: boolean }>('GET', `/api/tasks/${path(owner, repo, issue)}`);
 		remember({ profiles: result.target.profiles });
 		return result;
 	},
+    /** An issue-addressed view does not need an enrolled task. */
+    issue: (owner: string, repo: string, issue: number) => request<{ issue: IssueIntent; target: Target; issueWriter: boolean }>('GET', `/api/repos/${path(owner, repo)}/issues/${issue}`),
 	turns: (owner: string, repo: string, issue: number) =>
 		request<{ task: Task; turns: Turn[]; profiles?: ModelProfile[] }>('GET', `/api/tasks/${path(owner, repo, issue)}/turns`).then((result) => {
 			remember({ profiles: result.profiles });
@@ -88,8 +91,8 @@ export const api = {
 		]);
 		return { ...result, targets: overview.targets };
 	},
-	/** Sponsorship isn't available yet: nobody sponsors a task. */
-	sponsorships: async (): Promise<Task[]> => [],
+	sponsorships: () => request<IssueIntent[]>('GET', '/api/me/sponsorships'),
+	logoutStatus: () => request<{ remote: string }>('GET', '/auth/logout-status'),
 	operator: async (): Promise<never> => {
 		throw new ApiError(501, 'Operator views are not available yet.');
 	},
@@ -99,9 +102,10 @@ export const api = {
 
 export const actions = {
 	/** Sends the command; Concurro posts it on the issue as the user's command. Returns toast text. */
-	async command(task: Task, command: Command, arg = ''): Promise<string> {
-		const argument = (command === 'approve' || command === 'retry') && arg ? arg : undefined;
-		const result = await request<{ posted: string; actor: string }>('POST', `/api/tasks/${path(task.owner, task.repo, task.issue)}/commands`, { command, argument });
+	async command(task: IssueRef, command: Command, arg = ''): Promise<string> {
+		const argument = (['approve', 'retry', 'sponsor', 'withdraw'].includes(command)) && arg ? arg : undefined;
+		const result = await request<{ posted: string; actor: string }>('POST', `/api/repos/${path(task.owner, task.repo)}/issues/${task.issue}/commands`, { command, argument });
+		overviewCache = null;
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
 	async saveCredential(id: CredentialRouteId, secret: string): Promise<CredentialRoute> {
@@ -110,7 +114,11 @@ export const actions = {
 	async revokeCredential(id: CredentialRouteId): Promise<CredentialRoute> {
 		return request<CredentialRoute>('DELETE', `/api/me/credentials/${id}`);
 	},
-	async signOut(): Promise<void> {
-		await request('POST', '/auth/logout').catch(() => undefined);
-	}
+	async signOut(): Promise<{ remote: string }> {
+        const result = await request<{ remote: string }>('POST', '/auth/logout');
+        overviewCache = null;
+        session.me = { login: '', name: '' };
+        session.targets = []; session.tasks = []; session.profiles = {};
+        return result;
+    }
 };

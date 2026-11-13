@@ -76,3 +76,6 @@ export function diffLines(before: string, after: string): DiffLine[] {
 	}
 	return out;
 }
+
+/** An issue intent has its own route before task enrollment. */
+export const issueHref = (issue: { owner: string; repo: string; issue: number }) => withBase(`/issues/${encodeURIComponent(issue.owner)}/${encodeURIComponent(issue.repo)}/${issue.issue}`);

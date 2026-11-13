@@ -337,7 +337,7 @@ const hero: Task = {
 	timeline: [
 		ev(2 * D + 6 * H, 'github', 'odalby', 'Opened issue and applied label `concurro`'),
 		ev(2 * D + 6 * H - 2, 'command', 'mkeller', '`/concurro start`'),
-		ev(2 * D + 6 * H - 3, 'command', 'mkeller', '`/concurro sponsor`: model calls are paid with mkeller’s credentials'),
+		ev(2 * D + 6 * H - 3, 'command', 'mkeller', '`/concurro sponsor openai`: prospective consent; current calls remain org-funded'),
 		ev(2 * D + 6 * H - 9, 'turn', 'triage', 'Assessment: actionable, well-scoped bug', { turn: 1, tone: 'success' }),
 		ev(2 * D + 5 * H, 'turn', 'planner', 'Published plan v1 (`pl_3a91c0`)', { turn: 2 }),
 		ev(2 * D + 4 * H, 'review', 'plan-reviewer-a', 'Design review: changes requested, 2 objections', { turn: 3, tone: 'warning' }),

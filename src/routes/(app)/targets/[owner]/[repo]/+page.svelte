@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ArrowLeftRight, GitBranch, GitPullRequest, Lock, PlayCircle } from 'lucide-svelte';
-	import Avatar from '#lib/components/Avatar.svelte';
+	import IssueIntents from '#lib/components/IssueIntents.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import CodeBlock from '#lib/components/CodeBlock.svelte';
 	import DataTable from '#lib/components/DataTable.svelte';
@@ -40,7 +40,7 @@
 {#await data.result}
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
-{:then { target, tasks, runs }}
+{:then { target, tasks, runs, issues }}
 	{@const prs = tasks.filter((t) => t.pr)}
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
 		<span class="pair">
@@ -68,6 +68,7 @@
 		]}
 	>
 		{#if tab === 'issues'}
+			<IssueIntents {issues} />
 			{@const rows = inGroup(tasks)}
 			<Panel flush title="Enrolled issues" meta={String(rows.length)}>
 				{#snippet actions()}
@@ -77,7 +78,7 @@
 				{/snippet}
 				{#if rows.length}
 					<DataTable label="Issues">
-						<thead><tr><th class="r">#</th><th>Issue</th><th>Stage</th><th>Sponsor</th><th>Review</th><th class="r">Updated</th></tr></thead>
+						<thead><tr><th class="r">#</th><th>Issue</th><th>Stage</th><th>Prospective sponsors</th><th>Review</th><th class="r">Updated</th></tr></thead>
 						<tbody>
 							{#each rows as t (t.issue)}
 								<tr>
@@ -87,7 +88,7 @@
 										<p class="sub">opened by {t.author} · {t.labels.join(' · ')}</p>
 									</td>
 									<td class="nowrap"><Badge meta={taskStageMeta(t)} />{#if t.paused}<p class="sub mono">awaiting_credentials</p>{/if}</td>
-									<td>{#if t.sponsor}<Avatar login={t.sponsor} />{:else}<span class="muted">—</span>{/if}</td>
+									<td>{#each Object.entries(t.sponsorships?.slots ?? {}) as [provider, slot]}{#if slot?.sponsor_id}<p class="sub">{provider}: @{slot.login ?? slot.sponsor_id}</p>{/if}{/each}<span class="muted">{t.sponsorships?.status ?? 'pending'}</span></td>
 									<td><TaskSignals task={t} /></td>
 									<td class="r nowrap muted">{relTime(t.updatedAt)}</td>
 								</tr>

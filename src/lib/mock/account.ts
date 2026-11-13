@@ -10,32 +10,22 @@ export const credentials: CredentialRoute[] = [
 		status: 'valid',
 		fingerprint: 'sk-ant-…9f3a',
 		lastValidated: ago(3 * H),
-		lastUsed: ago(14)
+		lastUsed: ago(14), route: 'anthropic-api-key', models: ['claude-opus-5-5'], registrationAvailable: true
 	},
-	{
-		id: 'claude_subscription',
-		label: 'Claude subscription',
-		provider: 'anthropic',
-		kind: 'Subscription',
-		status: 'expired',
-		fingerprint: 'oat-…c2e8',
-		lastValidated: ago(9 * D),
-		lastUsed: ago(12 * D),
-		note: 'The session token expired. Reconnect to use subscription capacity before the API key.'
-	},
+	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', registrationAvailable: false, note: 'Subscription registration is not available in this phase.' },
 	{
 		id: 'openai_api',
 		label: 'OpenAI API key',
 		provider: 'openai',
 		kind: 'API key',
-		status: 'exhausted',
+		status: 'exhausted', route: 'openai-api-key', models: ['gpt-6.1-sol'], registrationAvailable: true,
 		fingerprint: 'sk-…41d7',
 		lastValidated: ago(5 * H),
 		lastUsed: ago(5 * H),
-		note: 'The provider reports insufficient quota. One sponsored task is paused.'
+		note: 'Synthetic quota status. Current calls remain org-funded.'
 	},
 	{
-		id: 'chatgpt_subscription',
+		id: 'chatgpt_subscription', registrationAvailable: false,
 		label: 'ChatGPT subscription',
 		provider: 'openai',
 		kind: 'Subscription',

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Activity, CircleCheck, FileCheck, GitPullRequestArrow, KeyRound, MessageCircleQuestionMark, OctagonAlert, PartyPopper, UserRoundCheck, CircleX } from 'lucide-svelte';
+	import IssueIntents from '#lib/components/IssueIntents.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import Button from '#lib/components/Button.svelte';
@@ -63,7 +64,7 @@
 		<Panel title="Recent activity"><Skeleton rows={6} /></Panel>
 	</div>
 	<Panel title="Targets"><Skeleton height={120} /></Panel>
-{:then { tasks, targets, activity }}
+{:then { tasks, targets, activity, issues }}
 	{@const needs = needsYou(tasks)}
 	<div class="tiles">
 		{#each tiles(tasks) as tile}
@@ -147,6 +148,7 @@
 		</div>
 	</section>
 
+	<IssueIntents {issues} />
 	<p class="sponsor-note muted"><Avatar login={session.me.login} size={16} /> Signed in as {session.me.login}. “Needs you” lists tasks you can approve, answer or sponsor.</p>
 {:catch error}
 	<ErrorState {error} />

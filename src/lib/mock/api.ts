@@ -2,7 +2,7 @@ import { store } from '#lib/state/store.svelte.ts';
 import type { Target, Task } from '#lib/types.ts';
 import { activity, runsFor, usage } from './account';
 import { operator } from './operator';
-import { ME, targets } from './reference';
+import { MOCK_ACTOR_ID, targets } from './reference';
 import { turnsFor } from './turns';
 
 /** Mimics network latency so skeletons are visible. */
@@ -33,22 +33,27 @@ const findTask = (owner: string, repo: string, issue: number): Task => {
 };
 
 export const api = {
-	overview: () => delay(() => ({ tasks: store.tasks, targets, activity })),
+	overview: () => delay(() => ({ tasks: store.tasks, issues: store.issues, targets, activity })),
 	target: (owner: string, repo: string) =>
 		delay(() => {
 			const target = findTarget(owner, repo);
 			const tasks = store.tasks.filter((t) => t.owner === owner && t.repo === repo);
-			return { target, tasks, runs: runsFor(tasks.map((t) => t.issue)) };
+			return { target, tasks, issues: store.issues.filter((i) => i.owner === owner && i.repo === repo), runs: runsFor(tasks.map((t) => t.issue)) };
 		}),
 	task: (owner: string, repo: string, issue: number) =>
-		delay(() => ({ task: findTask(owner, repo, issue), target: findTarget(owner, repo) })),
+		delay(() => ({ task: findTask(owner, repo, issue), target: findTarget(owner, repo), issueWriter: true })),
+    issue: (owner: string, repo: string, issue: number) => delay(() => {
+        const item = [...store.tasks, ...store.issues].find((t) => t.owner === owner && t.repo === repo && t.issue === issue);
+        if (!item) throw new NotFound('Issue is not visible.');
+        return { issue: item, target: findTarget(owner, repo), issueWriter: true };
+    }),
 	turns: (owner: string, repo: string, issue: number) =>
 		delay(() => {
 			const task = findTask(owner, repo, issue);
 			return { task, turns: turnsFor(task) };
 		}),
 	credentials: () => delay(() => ({ routes: store.credentials, targets, usage })),
-	sponsorships: () => delay(() => store.tasks.filter((t) => t.sponsor === ME)),
+	sponsorships: () => delay(() => [...store.tasks, ...store.issues].filter((t) => Object.values(t.sponsorships?.slots ?? {}).some((s) => s?.sponsor_id === String(MOCK_ACTOR_ID)))),
 	operator: () => delay(() => operator),
 	/** Synchronous index for the command palette. */
 	index: () => ({ targets, tasks: store.tasks })

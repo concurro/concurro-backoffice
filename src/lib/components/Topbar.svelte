@@ -17,6 +17,7 @@
 		const target: Crumb = { label: `${owner}/${repo}`, href: withBase(`/targets/${owner}/${repo}`), mono: true };
 		const task: Crumb = { label: `Issue #${issue}`, href: withBase(`/tasks/${owner}/${repo}/${issue}`) };
 		if (id.includes('/turns')) return [target, task, { label: turn ? `Turn ${turn}` : 'Run diagnostics' }];
+		if (id.includes('/issues/')) return [target, { label: `Issue #${issue}` }, { label: 'Provider consent' }];
 		if (id.includes('/tasks/')) return [target, { label: task.label }];
 		if (id.includes('/targets/')) return [{ label: 'Targets' }, { label: target.label, mono: true }];
 		if (id.endsWith('/me/credentials')) return [{ label: 'Me' }, { label: 'Credentials' }];

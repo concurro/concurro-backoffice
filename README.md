@@ -47,6 +47,7 @@ commit with `bash deploy/deploy.sh web FULL_COMMIT_SHA` from
 | `/` | Overview |
 | `/targets/[owner]/[repo]` | Target: issues, pull requests, Actions runs, configuration |
 | `/tasks/[owner]/[repo]/[issue]` | Task detail |
+| `/issues/[owner]/[repo]/[issue]` | Provider consent before task enrollment |
 | `/tasks/[owner]/[repo]/[issue]/turns/[turn]` | Run diagnostics |
 | `/me/credentials` | My credentials |
 | `/me/sponsorships` | My sponsorships |
@@ -54,8 +55,8 @@ commit with `bash deploy/deploy.sh web FULL_COMMIT_SHA` from
 | `/styleguide` | Tokens and components in both themes |
 
 Good starting points: `example-org/ledger-core#412` has the fullest history (three plan
-versions, two review rounds, 23 turns with every outcome); `example-org/tidepool#79` is
-paused on credentials; `example-org/ledger-core#398` waits for plan approval; `example-org/tidepool#94` was
+versions, two review rounds, 23 turns with every outcome); issue `/issues/example-org/ledger-core/501`
+shows pre-enrollment provider consent; `example-org/ledger-core#398` waits for plan approval; `example-org/tidepool#94` was
 merged before handoff. An unknown
 issue number, e.g. `/tasks/example-org/ledger-core/1`, shows the error state.
 
@@ -77,3 +78,10 @@ issue number, e.g. `/tasks/example-org/ledger-core/1`, shows the error state.
 
 Built with SvelteKit 3 and Svelte 5 runes. SvelteKit 3 reads its configuration from
 `vite.config.ts` and imports `src/lib` as `#lib/…` with file extensions.
+
+The portal now renders prospective OpenAI/Anthropic sponsorship, including pre-enrollment
+issue intent views and caller-only provider commands. Current model calls remain org-funded.
+Personal API-key forms support validation, replacement and local revoke; subscription
+registration remains unavailable until backend configured-route validators land. Credential
+coverage uses configured routes and validated model lists, not a CLI/provider-name guess.
+GitHub sign-out reports local completion separately from remote access-token cleanup.

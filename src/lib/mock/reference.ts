@@ -1,5 +1,6 @@
 import type { ModelProfile, RosterEntry, Target, User } from '#lib/types.ts';
 
+export const MOCK_ACTOR_ID = 42;
 export const ME = 'mkeller';
 
 export const users: User[] = [
@@ -108,6 +109,8 @@ const base = [
 ];
 
 export const targets: Target[] = base.map(({ calls, ...t }) => ({
+    writer: true,
+    credentialRequirements: t.roster.map((entry) => ({ role: ({plan_reviewer: 'plan_reviewers', pr_reviewer: 'pr_reviewers'} as Record<string,string>)[entry.role] ?? entry.role, profile: entry.profile, model: profile(entry.profile).model, provider: profile(entry.profile).provider, route: profile(entry.profile).provider === 'openai' ? 'openai-api-key' : 'anthropic-api-key' })),
 	...t,
 	defaultBranch: 'main',
 	config: config({ ...t, calls })

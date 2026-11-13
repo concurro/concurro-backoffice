@@ -22,7 +22,7 @@ export type Provider = 'anthropic' | 'openai';
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 export type AlertTone = 'note' | 'tip' | 'warning' | 'caution';
 export type CiStatus = 'passing' | 'failing' | 'pending' | 'none';
-export type Command = 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor';
+export type Command = 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor' | 'withdraw';
 
 export interface ModelProfile {
 	name: string;
@@ -44,6 +44,50 @@ export interface RosterEntry {
 	profile: string;
 }
 
+/** Trusted configured route, separate from the CLI harness and display model profile. */
+export interface CredentialRequirement {
+    role: string;
+    profile: string;
+    model: string;
+    route: string | null;
+    provider: Provider | null;
+    status?: string;
+}
+
+/** An issue identity works before a task checkpoint exists. */
+export interface IssueRef { owner: string; repo: string; issue: number; }
+
+/** Prospective provider owner, not the actual org-paid inference binding. */
+export interface SponsorSlot {
+    sponsor_id?: string | null;
+    login?: string;
+    status?: string;
+    epoch?: number;
+    provenance?: string;
+}
+
+/** Nonsecret daemon projection; pending source evidence must stay visibly pending. */
+export interface Sponsorship {
+    funding?: 'org';
+    status: string;
+    task_status?: string | null;
+    slots: Partial<Record<Provider, SponsorSlot>>;
+    source_slots?: Partial<Record<Provider, SponsorSlot>>;
+    coverage?: Partial<Record<Provider, CredentialRequirement[]>>;
+    pending?: string[];
+    facts?: { actor_id: string; provider: Provider; command: string }[];
+}
+
+/** A visible issue intent with no invented stage, budget or enrollment state. */
+export interface IssueIntent extends IssueRef {
+    title: string;
+    author: string;
+    labels: string[];
+    updatedAt: string;
+    body?: string;
+    sponsorships?: Sponsorship;
+}
+
 export interface Target {
 	owner: string;
 	repo: string;
@@ -55,6 +99,7 @@ export interface Target {
 	config: string;
 	/** Model profiles the roster refers to, from the target configuration. */
 	profiles?: ModelProfile[];
+	credentialRequirements?: CredentialRequirement[] | null;
 	/** Whether the signed-in user can push to the target (and so run commands). */
 	writer?: boolean;
 }
@@ -186,6 +231,7 @@ export interface Task {
 	atStage: Stage;
 	mode: Mode;
 	sponsor?: string;
+	sponsorships?: Sponsorship;
 	paused?: 'awaiting_credentials';
 	pauseReason?: string;
 	question?: string;
@@ -259,7 +305,7 @@ export type CredentialRouteId =
 	| 'claude_subscription'
 	| 'openai_api'
 	| 'chatgpt_subscription';
-export type CredentialStatus = 'valid' | 'expired' | 'exhausted' | 'revoked' | 'missing';
+export type CredentialStatus = 'valid' | 'invalid' | 'expired' | 'exhausted' | 'revoked' | 'missing';
 
 export interface CredentialRoute {
 	id: CredentialRouteId;
@@ -271,6 +317,13 @@ export interface CredentialRoute {
 	lastValidated?: string;
 	lastUsed?: string;
 	note?: string;
+    route?: string | null;
+    registrationAvailable?: boolean;
+    models?: string[] | null;
+    version?: number;
+    expiresAt?: string | null;
+    expiryKnown?: boolean;
+    statusReason?: string | null;
 }
 
 export interface UsageRow {

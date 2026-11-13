@@ -2,11 +2,15 @@
 	import { GitFork, ShieldCheck } from 'lucide-svelte';
 	import Alert from '#lib/components/Alert.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import { MOCK, signInUrl } from '#lib/api/index.ts';
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import { api, MOCK, signInUrl } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+    let remote = $state('');
+    onMount(() => { if (page.url.searchParams.has('logout')) api.logoutStatus().then((s) => { if (s.remote !== 'none') remote = s.remote; }).catch(() => remote = 'unknown'); });
 	const next = $derived(data.next.startsWith('/') && !data.next.startsWith('//') ? data.next : '/');
 </script>
 
@@ -17,6 +21,7 @@
 		<svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)" /><path d="M15.5 8.5a5 5 0 1 0 0 7" fill="none" stroke="var(--on-accent)" stroke-width="2.2" stroke-linecap="round" /></svg>
 		<h1>Sign in to Concurro</h1>
 		<p class="lead">From issue to reviewed pull request. Humans merge.</p>
+        {#if page.url.searchParams.has('logout')}<Alert tone="note" title="Signed out locally">GitHub access-token cleanup: {remote || page.url.searchParams.get('logout')}. Provider credentials and sponsorships are unchanged.</Alert>{/if}
 		{#if data.error}<Alert tone="caution" title="Sign-in failed">{data.error}</Alert>{/if}
 		<Button variant="primary" icon={GitFork} reload={!MOCK} href={MOCK ? withBase(next) : signInUrl(next)}>Continue with GitHub</Button>
 		<p class="fine"><ShieldCheck size={13} aria-hidden="true" /> Concurro reads your GitHub identity and repository permissions. It never merges on your behalf.</p>

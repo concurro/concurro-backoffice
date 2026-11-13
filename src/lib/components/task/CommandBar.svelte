@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleCheck, HandCoins, Play, RotateCcw, Square, StepForward, Trash2 } from 'lucide-svelte';
+	import { CircleCheck, Play, RotateCcw, Square, StepForward, Trash2 } from 'lucide-svelte';
 	import { bytes } from '#lib/format.ts';
 	import { isMerged, MERGED_STAGES, type IconType } from '#lib/meta.ts';
 	import { actions, MOCK, session } from '#lib/api/index.ts';
@@ -33,7 +33,6 @@
 		{ command: 'retry', label: 'Retry', icon: RotateCcw, enabled: ['blocked', 'escalated'].includes(task.stage) || task.pr?.ci === 'failing', why: 'Nothing has failed', title: 'Retry the last stage?', body: `The last stage runs again. Design approvals are preserved. ${MOCK ? 'You can give the agent feedback.' : 'You can grant extra plan revisions if the allowance ran out.'}`, confirm: 'Retry' },
 		{ command: 'resume', label: 'Resume', icon: StepForward, enabled: !!task.paused || ['stopped', 'blocked'].includes(task.stage), why: 'The task is not paused or stopped', title: 'Resume this task?', body: 'The task adopts current settings and instructions and continues from where it stopped. Completed work, approvals and spent budgets are preserved.', confirm: 'Resume' },
 		{ command: 'stop', label: 'Stop', icon: Square, enabled: !TERMINAL.includes(task.stage), why: 'The task is not running', title: 'Stop this task?', body: 'Running turns are cancelled and no new turns start. You can resume later.', confirm: 'Stop task' },
-		{ command: 'sponsor', label: 'Sponsor', icon: HandCoins, enabled: MOCK && task.sponsor !== session.me.login && !TERMINAL.includes(task.stage), why: !MOCK ? 'Sponsorship isn’t available yet' : task.sponsor === session.me.login ? 'You already sponsor this task' : 'The task is finished', title: 'Sponsor this task?', body: `Model calls for this task will be paid with your provider credentials${task.sponsor ? `, replacing @${task.sponsor}` : ''}. The task pauses if a required credential is missing.`, confirm: 'Sponsor task' },
 		{ command: 'invalidate', label: 'Invalidate', icon: Trash2, enabled: !isMerged(task.stage) && task.stage !== 'closed', why: 'The task is finished', title: 'Invalidate this task?', body: '', confirm: 'Invalidate task' }
 	]);
 

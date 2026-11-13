@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
 	import { Check, HandCoins, KeyRound, LogOut, Monitor, Moon, Sun } from 'lucide-svelte';
+	import { toast } from '#lib/state/toast.svelte.ts';
 	import { goto } from '$app/navigation';
 	import { actions, session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
@@ -10,8 +11,10 @@
 	const me = $derived(session.me);
 
 	async function signOut() {
-		await actions.signOut();
-		goto(withBase('/signin'));
+        try {
+            const result = await actions.signOut();
+            goto(withBase('/signin?logout=' + encodeURIComponent(result.remote)));
+        } catch (error) { toast(error instanceof Error ? error.message : 'Sign-out could not be confirmed. Try again.', 'danger'); }
 	}
 	const themes = [
 		{ value: 'light', label: 'Light', icon: Sun },

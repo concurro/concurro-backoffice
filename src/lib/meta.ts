@@ -110,6 +110,7 @@ export const findingMeta: Record<FindingStatus, Meta> = {
 };
 
 export const credentialMeta: Record<CredentialStatus, Meta> = {
+	invalid: { label: 'Invalid', tone: 'danger', icon: CircleX },
 	valid: m('Valid', 'success', CircleCheck),
 	expired: m('Expired', 'warning', Clock),
 	exhausted: m('Exhausted', 'danger', CircleAlert),
