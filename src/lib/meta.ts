@@ -67,6 +67,8 @@ export const stageMeta: Record<Stage, Meta> = {
 	merged: m('Merged', 'accent', GitMerge),
 	observed_merged: m('Merged', 'accent', GitMerge),
 	closed: m('Closed', 'neutral', CircleSlash),
+	awaiting_credentials: m('Awaiting credentials', 'warning', OctagonAlert),
+	budget_exhausted: m('Budget exhausted', 'warning', OctagonAlert),
 	blocked: m('Blocked', 'danger', OctagonAlert),
 	stopped: m('Stopped', 'neutral', CircleStop),
 	rejected: m('Rejected', 'neutral', Ban),

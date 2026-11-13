@@ -6,7 +6,7 @@
 	let { issues }: { issues: IssueIntent[] } = $props();
 </script>
 {#if issues.length}
-	<Panel title="Issue provider consent" meta="org-funded shadow">
+	<Panel title="Issue provider consent" meta="provider consent">
 		<ul>{#each issues as issue}<li><a href={issueHref(issue)}>{issue.owner}/{issue.repo}#{issue.issue} · {issue.title}</a><Badge plain tone="neutral">{issue.sponsorships?.status ?? 'pending'}</Badge>{#each Object.entries(issue.sponsorships?.slots ?? {}) as [provider, slot]}{#if slot?.sponsor_id}<span>{provider}: @{slot.login ?? slot.sponsor_id}</span>{/if}{/each}</li>{/each}</ul>
 	</Panel>
 {/if}

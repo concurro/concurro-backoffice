@@ -56,7 +56,7 @@
 </script>
 
 <svelte:head><title>My credentials · Concurro</title></svelte:head>
-<PageHeader title="My credentials" subtitle="Write-only personal credentials for prospective provider sponsorship. Current inference remains org-funded; storing, replacing or revoking a personal key does not change current org sessions." />
+<PageHeader title="My credentials" subtitle="Write-only personal credentials for provider sponsorship. Configured contributed tasks use exact admitted versions; organization-funded sessions keep their organization credentials." />
 {#await data.result}<Skeleton rows={8} />{:then { routes, targets }}
 	<div class="routes">
 		{#each routes as route (route.id)}
@@ -73,7 +73,7 @@
 			</article>
 		{/each}
 	</div>
-	<Panel title="Configured route coverage" meta="prospective · no current personal charges">
+	<Panel title="Configured route coverage" meta="selected routes · funding follows task policy">
 		{#each targets as target}
 			<h3>{target.owner}/{target.repo}</h3>
 			{#if target.credentialRequirements?.length}<ul>{#each target.credentialRequirements as requirement}<li><span class="mono">{requirement.profile}</span> · {requirement.role.replaceAll('_', ' ')} · {requirement.route ?? 'no configured route'} · {requirement.model} · <strong>{coverage(requirement, routes)}</strong></li>{/each}</ul>{:else}<p class="muted">Configured route requirements are unavailable; coverage is unknown.</p>{/if}
@@ -86,7 +86,7 @@
 	{#if MOCK}<Alert tone="note" title="Mock mode">Synthetic validation only. Nothing leaves this browser tab.</Alert>{/if}
 	{#snippet footer()}<Button onclick={() => editOpen = false}>Cancel</Button><Button type="submit" form="credential" variant="primary" disabled={validating || !secret} icon={validating ? LoaderCircle : undefined}>{validating ? 'Validating…' : 'Validate and save'}</Button>{/snippet}
 </Modal>
-<Modal bind:open={revokeOpen} title="Revoke {revoking?.label ?? ''}?" description="Deletes this stored personal secret. Your prospective sponsorship remains visible with missing coverage. Current org-paid inference and sessions are unaffected. It does not revoke the key at the provider.">
+<Modal bind:open={revokeOpen} title="Revoke {revoking?.label ?? ''}?" description="Deletes this stored personal secret. Your sponsorship remains visible with missing coverage. Sessions using this personal version retire; organization-funded sessions are unaffected. It does not revoke the key at the provider.">
 	{#snippet footer()}<Button onclick={() => revokeOpen = false}>Cancel</Button><Button variant="danger-solid" onclick={revoke}>Revoke stored key</Button>{/snippet}
 </Modal>
 <style>

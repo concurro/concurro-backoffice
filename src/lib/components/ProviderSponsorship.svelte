@@ -25,7 +25,7 @@
 </script>
 
 <Panel title="Provider sponsorship" id="sponsorship">
-	<p class="notice">Current model calls remain org-funded. Sponsorship records your consent to fund this provider on this issue when contributed inference is enabled, including authorized retries.</p>
+	<p class="notice">{#if projection?.funding === 'contributed'}This task uses each provider’s selected sponsor credentials, including authorized retries. Missing credentials pause new calls; there is no organization fallback.{:else if projection?.funding === 'org'}This task uses organization credentials. These provider grants are prospective consent for contributed funding, including authorized retries.{:else}Funding policy is unconfirmed. Sponsorship records your consent for this provider, including authorized retries; displayed consent alone does not prove a personal charge.{/if}</p>
 	<p class="state">Source: {projection?.status ?? 'unavailable'}{#if projection?.task_status} · task: {projection.task_status}{/if}</p>
 	{#each providers as provider}
 		{@const slot = projection?.slots?.[provider]}
@@ -37,7 +37,7 @@
 			{#if source?.sponsor_id && source.sponsor_id !== slot?.sponsor_id}<p class="muted">Issue intent: @{source.login ?? source.sponsor_id}; task adoption pending.</p>{/if}
 			{#if projection?.pending?.includes(provider) || projection?.status !== 'confirmed' || projection?.task_status === 'pending'}<p class="muted">Confirmation or adoption pending. Displayed ownership may change after reconciliation.</p>{/if}
 			{#if projection?.coverage?.[provider]?.length}
-				<ul>{#each projection.coverage[provider] ?? [] as route}<li><span class="mono">{route.profile}</span> · {route.route} · {route.status?.replaceAll('_', ' ') ?? 'unknown'}</li>{/each}</ul>
+				<ul>{#each projection.coverage[provider] ?? [] as route}<li><span class="mono">{route.profile}</span> · {route.role} · {route.route} · {route.status?.replaceAll('_', ' ') ?? 'unknown'}</li>{/each}</ul>
 			{:else}<p class="muted">Coverage is not yet confirmed for this provider.</p>{/if}
 			<div class="actions">
 				<Button size="sm" disabled={busy || !writer} onclick={() => command('sponsor', provider)}>{mine ? 'Renew my' : 'Sponsor'} {provider === 'openai' ? 'OpenAI' : 'Anthropic'}</Button>
@@ -45,7 +45,11 @@
 			</div>
 		</div>
 	{/each}
-	<p class="notice">Sponsor replaces only this provider’s prospective owner. Withdrawal affects only your own consent, including older epochs; it does not revoke your token, change the other provider or remove design approvals. Self-withdrawal remains available if writer access is lost.</p>
+	<p class="notice">Sponsor replaces only this provider’s owner. Withdrawal affects only your own consent, including older sponsorship revisions; it does not revoke your token, change the other provider or remove design approvals. Self-withdrawal remains available if writer access is lost.</p>
+	{#if projection?.observations_status === 'unknown'}<p class="notice">Gateway request evidence is unavailable. Usage and completion are unknown.</p>{/if}
+	{#if projection?.observations?.length}
+        <details><summary>Gateway request evidence</summary><ul>{#each projection.observations as event}<li>{event.binding.sponsorship_provider} · owner {event.binding.sponsor} · credential version {event.binding.credential_version} · {event.source ?? 'gateway'} · {event.category ?? (event.source === 'provider' && event.completed ? 'provider completed' : 'request observed')} · {event.usage ? `${event.usage.input_tokens} input / ${event.usage.output_tokens} output tokens` : 'usage unknown'}</li>{/each}</ul></details>
+    {/if}
 	<Button size="sm" onclick={() => invalidateAll()} disabled={busy}>Refresh sponsorship</Button>
 </Panel>
 

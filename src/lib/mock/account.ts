@@ -22,7 +22,7 @@ export const credentials: CredentialRoute[] = [
 		fingerprint: 'sk-…41d7',
 		lastValidated: ago(5 * H),
 		lastUsed: ago(5 * H),
-		note: 'Synthetic quota status. Current calls remain org-funded.'
+		note: 'Synthetic quota status. Each task follows its configured funding policy.'
 	},
 	{
 		id: 'chatgpt_subscription', registrationAvailable: false,

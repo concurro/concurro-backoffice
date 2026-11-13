@@ -10,10 +10,14 @@ for (const task of tasks) {
         anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active', epoch: 1 }
     }};
     if (task.paused) {
-        task.alert = { tone: 'note', title: 'Prospective coverage needs attention', body: 'The personal credential is unavailable. Current model calls remain org-funded.' };
-        task.stage = task.atStage;
+        task.sponsorships.funding = 'contributed';
+        task.sponsorships.observations = [
+            { request: 'synthetic-native', source: 'native', completed: false, category: null, usage: null, binding: { sponsorship_provider: 'openai', sponsor: String(MOCK_ACTOR_ID), credential_version: 1 } },
+            { request: 'synthetic-provider', source: 'provider', completed: true, category: null, usage: { input_tokens: 2, output_tokens: 3 }, binding: { sponsorship_provider: 'anthropic', sponsor: '84', credential_version: 1 } }
+        ];
+        task.stage = task.paused;
+        task.alert = { tone: 'caution', title: 'Awaiting credentials', body: 'Correct the provider credentials, then a writer may retry. There is no organization fallback.' };
     }
-    task.paused = undefined; task.pauseReason = undefined;
 }
 export const store = $state({ tasks, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
 
@@ -27,7 +31,7 @@ function log(task: Task, text: string) {
 
 function move(task: Task, stage: Stage, title: string, body: string, tone: Task['alert']['tone'] = 'note') {
 	task.stage = stage;
-	if (!['blocked', 'stopped', 'escalated', 'rejected', 'closed'].includes(stage)) task.atStage = stage;
+	if (!['blocked', 'stopped', 'awaiting_credentials', 'budget_exhausted', 'escalated', 'rejected', 'closed'].includes(stage)) task.atStage = stage;
 	task.alert = { tone, title, body };
 }
 
@@ -42,7 +46,7 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
         const old = item.sponsorships.slots[provider];
         if (command === 'sponsor') item.sponsorships.slots[provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
         else if (old?.sponsor_id === String(MOCK_ACTOR_ID)) item.sponsorships.slots[provider] = { sponsor_id: null, status: 'withdrawn', epoch: (old.epoch ?? 0) + 1 };
-        return `Posted /concurro ${command} ${provider} for @${ME}. Current calls remain org-funded.`;
+        return `Posted /concurro ${command} ${provider} for @${ME}. Funding follows the issue’s configured policy.`;
     }
     const task = store.tasks.find((t) => t === item);
     if (!task) throw new Error('This demo issue is not enrolled.');

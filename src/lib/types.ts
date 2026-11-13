@@ -11,6 +11,8 @@ export type Stage =
 	| 'merged'
 	| 'observed_merged'
 	| 'closed'
+	| 'awaiting_credentials'
+	| 'budget_exhausted'
 	| 'blocked'
 	| 'stopped'
 	| 'rejected'
@@ -68,7 +70,10 @@ export interface SponsorSlot {
 
 /** Nonsecret daemon projection; pending source evidence must stay visibly pending. */
 export interface Sponsorship {
-    funding?: 'org';
+    funding?: 'org' | 'contributed' | 'unknown';
+    /** Sanitized gateway observations; absent usage stays unknown. */
+    observations_status?: 'available' | 'unknown';
+    observations?: { request: string; source?: string; completed?: boolean; category: string | null; usage: { input_tokens: number; output_tokens: number } | null; binding: { sponsorship_provider: Provider; sponsor: string; credential_version: number } }[];
     status: string;
     task_status?: string | null;
     slots: Partial<Record<Provider, SponsorSlot>>;
@@ -232,7 +237,7 @@ export interface Task {
 	mode: Mode;
 	sponsor?: string;
 	sponsorships?: Sponsorship;
-	paused?: 'awaiting_credentials';
+	paused?: 'awaiting_credentials' | 'budget_exhausted';
 	pauseReason?: string;
 	question?: string;
 	alert: TaskAlert;

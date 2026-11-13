@@ -8,7 +8,7 @@
     let { data }: PageProps = $props();
 </script>
 <svelte:head><title>My sponsorships · Concurro</title></svelte:head>
-<PageHeader title="My sponsorships" subtitle="Your visible provider consent and issue history. Current inference remains org-funded; these grants are prospective and do not report personal charges." />
+<PageHeader title="My sponsorships" subtitle="Your visible provider consent and issue history. Contributed tasks use selected personal credentials; organization-funded tasks retain organization accounting." />
 {#await data.result}<Skeleton rows={6} />{:then issues}
     {#if issues.length}<IssueIntents {issues} />{:else}<EmptyState title="No provider sponsorships" text="On an issue, choose Sponsor OpenAI or Sponsor Anthropic, or comment /concurro sponsor openai or /concurro sponsor anthropic." />{/if}
 {:catch error}<ErrorState {error} />{/await}

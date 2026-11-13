@@ -63,7 +63,7 @@
 			<Button variant="ghost" icon={ExternalLink} href="#main">GitHub</Button>
 		{/snippet}
 		<Badge meta={taskStageMeta(task)} />
-		{#if task.paused}<Badge tone="danger">awaiting_credentials</Badge>{/if}
+		{#if task.paused && task.stage !== task.paused}<Badge tone="danger">{task.paused === 'budget_exhausted' ? 'Budget exhausted' : 'Awaiting credentials'}</Badge>{/if}
 		<Badge tone={task.mode === 'autonomous' ? 'accent' : 'neutral'}>{task.mode}</Badge>
 		{#if task.pr}
 			<span class="pr">
