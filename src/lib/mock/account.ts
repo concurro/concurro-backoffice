@@ -12,7 +12,7 @@ export const credentials: CredentialRoute[] = [
 		lastValidated: ago(3 * H),
 		lastUsed: ago(14), route: 'anthropic-api-key', models: ['claude-opus-5-5'], registrationAvailable: true
 	},
-	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', registrationAvailable: false, note: 'Subscription registration is not available in this phase.' },
+	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', route: 'claude-subscription', registrationAvailable: true, note: 'Sign in locally with the CLI, then paste the token. Validation uses your provider usage.' },
 	{
 		id: 'openai_api',
 		label: 'OpenAI API key',
@@ -25,7 +25,7 @@ export const credentials: CredentialRoute[] = [
 		note: 'Synthetic quota status. Each task follows its configured funding policy.'
 	},
 	{
-		id: 'chatgpt_subscription', registrationAvailable: false,
+		id: 'chatgpt_subscription', route: 'chatgpt-subscription', registrationAvailable: true,
 		label: 'ChatGPT subscription',
 		provider: 'openai',
 		kind: 'Subscription',

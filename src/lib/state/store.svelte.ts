@@ -1,7 +1,7 @@
 import { credentials } from '#lib/mock/account.ts';
 import { ME, MOCK_ACTOR_ID } from '#lib/mock/reference.ts';
 import { tasks } from '#lib/mock/tasks.ts';
-import type { Command, CredentialRouteId, IssueIntent, IssueRef, Provider, Stage, Task } from '#lib/types.ts';
+import type { Command, CredentialCandidate, CredentialRouteId, IssueIntent, IssueRef, Provider, Stage, Task } from '#lib/types.ts';
 
 /** In-browser mock state. Mutations stay local; nothing leaves the page. */
 for (const task of tasks) {
@@ -85,10 +85,20 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
 	}
 }
 
-export function saveCredential(id: CredentialRouteId, secret: string) {
+/** Simulate candidate validation without retaining token/account inputs. */
+export function saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
 	const route = store.credentials.find((c) => c.id === id)!;
-	if (!route.registrationAvailable) throw new Error('Subscription registration is not available.');
+	if (!secret.trim()) throw new Error('Enter a credential.');
+    if (route.kind === 'Subscription' && !candidate.models?.some((model) => model.trim())) throw new Error('Select models to validate.');
+    if (id === 'chatgpt_subscription' && !candidate.account_id?.trim()) throw new Error('Enter the ChatGPT account ID.');
+    if (secret === 'synthetic-rejected') throw new Error('Synthetic provider rejection; previous version preserved.');
 	route.status = 'valid';
+    route.version = (route.version ?? 0) + 1;
+    route.expiryKnown = false;
+    route.expiresAt = null;
+    if (route.kind === 'Subscription') route.models = [...new Set(candidate.models?.map((model) => model.trim()))];
+    route.accountLabel = id === 'chatgpt_subscription' ? 'Supplied ChatGPT account (mock)' : null;
+    route.accountVerified = false;
 	route.fingerprint = 'sha256:mock-' + secret.length;
 	route.lastValidated = now();
 	route.note = undefined;

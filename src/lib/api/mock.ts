@@ -1,7 +1,8 @@
 import { api as fixtures } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
 import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialRouteId, IssueRef } from '#lib/types.ts';
+import type { Command, CredentialCandidate, CredentialRouteId, IssueRef } from '#lib/types.ts';
+import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
 
 /** The original mockup: fixtures served with an artificial delay, commands applied to in-browser state. */
@@ -30,8 +31,9 @@ export const api = {
 
 export const actions = {
 	command: async (task: IssueRef, command: Command, arg = '') => runCommand(task, command, arg),
-	async saveCredential(id: CredentialRouteId, secret: string) {
-		saveCredential(id, secret);
+	async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
+		try { saveCredential(id, secret, candidate); }
+		catch (error) { throw new ApiError(422, error instanceof Error ? error.message : 'Synthetic validation failed.'); }
 		return store.credentials.find((c) => c.id === id)!;
 	},
 	async revokeCredential(id: CredentialRouteId) {

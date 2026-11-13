@@ -1,5 +1,5 @@
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, ActionsRun, Command, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, Turn, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -108,9 +108,9 @@ export const actions = {
 		overviewCache = null;
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
-	async saveCredential(id: CredentialRouteId, secret: string): Promise<CredentialRoute> {
-		return request<CredentialRoute>('PUT', `/api/me/credentials/${id}`, { secret });
-	},
+    async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}): Promise<CredentialRoute> {
+        return request<CredentialRoute>('PUT', '/api/me/credentials/' + id, { secret, ...candidate });
+    },
 	async revokeCredential(id: CredentialRouteId): Promise<CredentialRoute> {
 		return request<CredentialRoute>('DELETE', `/api/me/credentials/${id}`);
 	},

@@ -312,6 +312,14 @@ export type CredentialRouteId =
 	| 'chatgpt_subscription';
 export type CredentialStatus = 'valid' | 'invalid' | 'expired' | 'exhausted' | 'revoked' | 'missing';
 
+/** Write-only candidate metadata; model defaults come from configured route requirements. */
+export interface CredentialCandidate {
+    /** Distinct models validated atomically with this token. */
+    models?: string[];
+    /** Supplied ChatGPT account header; not authenticated account identity. */
+    account_id?: string;
+}
+
 export interface CredentialRoute {
 	id: CredentialRouteId;
 	label: string;
@@ -329,6 +337,10 @@ export interface CredentialRoute {
     expiresAt?: string | null;
     expiryKnown?: boolean;
     statusReason?: string | null;
+    /** Opaque account hint supplied with this credential version. */
+    accountLabel?: string | null;
+    /** True only with authenticated evidence, never merely a successful probe. */
+    accountVerified?: boolean;
 }
 
 export interface UsageRow {
