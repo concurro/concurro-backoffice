@@ -84,15 +84,18 @@ const runTitles = [
 	'review · pr-reviewer-a · turn'
 ];
 
-export function runsFor(issues: number[]): ActionsRun[] {
+export function runsFor(target: { owner: string; repo: string }, issues: number[]): ActionsRun[] {
 	if (!issues.length) return [];
 	return statuses.map((status, i) => {
 		const turn = 23 - i * 2;
+		const issue = issues[i % issues.length];
 		return {
 			id: 9_417_730_521 - i * 1_327,
+			attempt: 1,
 			title: `${runTitles[i]} ${Math.max(turn, 1)}`,
 			status,
-			issue: issues[i % issues.length],
+			task: { owner: target.owner, repo: target.repo, issue },
+			issue,
 			turn: Math.max(turn, 1),
 			startedAt: ago(11 + i * 47),
 			durationS: status === 'queued' ? 0 : 140 + ((i * 263) % 1500)

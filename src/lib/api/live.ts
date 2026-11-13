@@ -1,5 +1,5 @@
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, ActionsRun, Command, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import type { ActivityItem, Command, TargetView, CredentialRoute, CredentialRouteId, ModelProfile, Target, Task, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -66,8 +66,8 @@ export const api = {
 		}
 		return overviewCache.promise;
 	},
-	async target(owner: string, repo: string): Promise<{ target: Target; tasks: Task[]; runs: ActionsRun[] }> {
-		const result = await request<{ target: Target; tasks: Task[]; runs: ActionsRun[] }>('GET', `/api/targets/${path(owner, repo)}`);
+	async target(owner: string, repo: string): Promise<TargetView> {
+		const result = await request<TargetView>('GET', `/api/targets/${path(owner, repo)}`);
 		remember({ profiles: result.target.profiles });
 		return result;
 	},

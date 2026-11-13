@@ -40,7 +40,7 @@
 {#await data.result}
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
-{:then { target, tasks, runs }}
+{:then { target, tasks, runs, runsMessage }}
 	{@const prs = tasks.filter((t) => t.pr)}
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
 		<span class="pair">
@@ -132,17 +132,20 @@
 						<thead><tr><th>Run</th><th>Agent turn</th><th>Status</th><th>Task</th><th class="r">Started</th><th class="r">Duration</th></tr></thead>
 						<tbody>
 							{#each runs as run (run.id)}
+								{@const task = run.task ?? { owner: target.owner, repo: target.repo, issue: run.issue }}
 								<tr>
 									<td class="mono nowrap">{run.id}</td>
-									<td class="title"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}/turns/${run.turn}`)}>{run.title}</a></td>
+									<td class="title"><a href={`${taskHref(task)}/turns/${run.turn}`}>{run.title}</a></td>
 									<td><Badge tone={runTone[run.status]}>{run.status}</Badge></td>
-									<td class="mono nowrap"><a href={withBase(`/tasks/${target.owner}/${target.repo}/${run.issue}`)}>#{run.issue}</a></td>
+									<td class="mono nowrap"><a href={taskHref(task)}>{task.repo}#{task.issue}</a></td>
 									<td class="r nowrap muted">{relTime(run.startedAt)}</td>
 									<td class="r nowrap">{duration(run.durationS * 1000)}</td>
 								</tr>
 							{/each}
 						</tbody>
 					</DataTable>
+				{:else if runsMessage}
+					<EmptyState icon={PlayCircle} title="Runs unavailable" text={runsMessage} />
 				{:else}
 					<EmptyState icon={PlayCircle} title="No runs yet" text="Each agent turn executes as a GitHub Actions run on the fork." />
 				{/if}

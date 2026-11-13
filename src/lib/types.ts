@@ -307,16 +307,29 @@ export interface ActivityItem {
 	tone?: Tone;
 }
 
+/** One GitHub Actions run, with the task and turns the service recorded for it. */
 export interface ActionsRun {
 	id: number;
-	/** The run attempt the service recorded; absent for runs it never assigned. */
 	attempt?: number;
 	title: string;
+	/** GitHub's own run status, not a turn outcome. */
 	status: 'success' | 'failure' | 'in_progress' | 'queued' | 'cancelled';
+	/** The task this run served; a run serves one task's turns. */
+	task?: { owner: string; repo: string; issue: number };
 	issue: number;
+	/** The first turn the run served, for the diagnostics link. */
 	turn: number;
 	startedAt: string;
+	/** Wall-clock seconds GitHub reports for the run; 0 while it is still going. */
 	durationS: number;
+}
+
+/** `GET /api/targets/{owner}/{repo}`; `runsMessage` says why the run list is empty. */
+export interface TargetView {
+	target: Target;
+	tasks: Task[];
+	runs: ActionsRun[];
+	runsMessage: string | null;
 }
 
 export interface OperatorStatus {
