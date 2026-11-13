@@ -32,6 +32,9 @@ export const bytes = (s: string) => new TextEncoder().encode(s).length;
 export const taskHref = (t: { owner: string; repo: string; issue: number }) => withBase(`/tasks/${t.owner}/${t.repo}/${t.issue}`);
 export const targetHref = (t: { owner: string; repo: string }) => withBase(`/targets/${t.owner}/${t.repo}`);
 
+/** The issue on GitHub, where a writer gives commands themselves. */
+export const issueUrl = (t: { owner: string; repo: string; issue: number }) => `https://github.com/${t.owner}/${t.repo}/issues/${t.issue}`;
+
 export interface DiffLine {
 	kind: 'ctx' | 'add' | 'del' | 'hunk' | 'file';
 	text: string;

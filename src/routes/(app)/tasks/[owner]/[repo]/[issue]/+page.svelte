@@ -20,7 +20,7 @@
 	import PlanPanel from '#lib/components/task/PlanPanel.svelte';
 	import PrReviewPanel from '#lib/components/task/PrReviewPanel.svelte';
 	import ReadinessPanel from '#lib/components/task/ReadinessPanel.svelte';
-	import { relTime, targetHref, taskHref } from '#lib/format.ts';
+	import { issueUrl, relTime, targetHref, taskHref } from '#lib/format.ts';
 	import { ciMeta, stepIndex, steps, taskStageMeta } from '#lib/meta.ts';
 	import { session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
@@ -61,7 +61,7 @@
 		{/snippet}
 		{#snippet actions()}
 			<Button icon={SquareTerminal} href={turns}>Run diagnostics</Button>
-			<Button variant="ghost" icon={ExternalLink} href="#main">GitHub</Button>
+			<Button variant="ghost" icon={ExternalLink} href={issueUrl(task)} external>GitHub</Button>
 		{/snippet}
 		<Badge meta={taskStageMeta(task)} />
 		{#if task.paused}<Badge tone="danger">awaiting_credentials</Badge>{/if}

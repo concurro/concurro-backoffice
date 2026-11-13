@@ -309,6 +309,8 @@ export interface ActivityItem {
 
 export interface ActionsRun {
 	id: number;
+	/** The run attempt the service recorded; absent for runs it never assigned. */
+	attempt?: number;
 	title: string;
 	status: 'success' | 'failure' | 'in_progress' | 'queued' | 'cancelled';
 	issue: number;
