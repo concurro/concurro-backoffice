@@ -101,3 +101,7 @@ The API can persist issue metadata and lightweight checkpoint summaries locally.
 an older snapshot during a background refresh, the page shows its observation time and checks
 for completion without hiding the saved content. Refresh failures remain visible with a retry
 action. Fixture mode and APIs without cache metadata retain their existing behavior.
+
+Targets and their task details require write, maintain or admin permission on the upstream
+repository. Fork write permission is not required. The API enforces this for direct URLs as
+well; command controls follow the returned writer permission.

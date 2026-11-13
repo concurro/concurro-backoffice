@@ -187,7 +187,9 @@
 		</div>
 	</div>
 
-	<CommandBar task={{ ...task, plans: phaseTask?.plans ?? task.plans }} />
+	{#if data.resource.value?.target.writer}
+		<CommandBar task={{ ...task, plans: phaseTask?.plans ?? task.plans }} />
+	{/if}
 {/if}
 
 <style>

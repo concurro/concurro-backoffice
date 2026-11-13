@@ -143,6 +143,8 @@
 						<Badge plain tone="neutral" icon={CircleCheck}>{c.done} finished</Badge>
 					</p>
 				</a>
+			{:else}
+				<EmptyState title="No accessible targets" text="Targets appear here when you have write access to their upstream repository." />
 			{/each}
 		</div>
 	</section>
