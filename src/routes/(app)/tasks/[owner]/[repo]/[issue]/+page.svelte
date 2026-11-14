@@ -10,6 +10,7 @@
 	import Meter from '#lib/components/Meter.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import SavedData from '#lib/components/SavedData.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import StageStepper from '#lib/components/StageStepper.svelte';
 	import Timeline from '#lib/components/Timeline.svelte';
@@ -46,14 +47,6 @@
 		? { ...phaseData.value.task, pr: task.pr } : undefined);
 	const timelineTask = $derived(timelineData?.value?.task.revision === summary?.revision ? timelineData?.value?.task : undefined);
 	const ciLoading = $derived(!!pullData?.loading && !pullData.value);
-	const snapshot = $derived(data.resource.value?.cache);
-	const checkingSnapshot = $derived(data.resource.loading || (snapshot?.refreshing && !data.resource.error));
-	$effect(() => {
-		if ((snapshot?.refreshing || (snapshot?.pendingCommand && !snapshot.error)) && !data.resource.loading && !data.resource.error) {
-			const timer = setTimeout(data.resource.refresh, snapshot?.refreshing ? 1000 : 5000);
-			return () => clearTimeout(timer);
-		}
-	});
 	let refreshingRevision = '';
 	$effect(() => {
 		const changed = [phaseData?.value?.task, timelineData?.value?.task, livePull]
@@ -115,20 +108,7 @@
 	</PageHeader>
 
 	{#if pullData?.error}<ErrorState error={pullData.error} retry={pullData.refresh} />{/if}
-	{#if snapshot?.error}
-		<Alert tone="caution" title="Showing saved issue data">
-			{snapshot.error} Saved data last verified {relTime(snapshot.observedAt)}.
-			{#snippet actions()}
-				<Button size="sm" onclick={data.resource.refresh} disabled={checkingSnapshot}>
-					{checkingSnapshot ? 'Checking…' : 'Check for updates'}
-				</Button>
-			{/snippet}
-		</Alert>
-	{:else if snapshot?.pendingCommand}
-		<p class="muted" role="status">Command sent. Waiting for the issue to update…</p>
-	{:else if snapshot?.refreshing}
-		<p class="muted" role="status">Refreshing issue… Showing the snapshot from {relTime(snapshot.observedAt)}.</p>
-	{/if}
+	<SavedData resource={data.resource} label="issue" />
 	<StageStepper {task} selected={phase} onselect={select} />
 
 	<Alert tone={task.alert.tone} title={task.alert.title}>

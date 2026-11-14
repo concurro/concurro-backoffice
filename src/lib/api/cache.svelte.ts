@@ -34,6 +34,10 @@ export class Resource<T> {
 	};
 }
 
+let epoch = 0;
+/** How often the cache was cleared, so a read begun before a clear can tell its result is obsolete. */
+export const cacheEpoch = () => epoch;
+
 const entries = new Map<string, { resource: Resource<unknown>; revision?: string }>();
 const FRESH_MS = 10_000;
 
@@ -52,4 +56,5 @@ export function cached<T>(key: string, load: () => Promise<T>, revision?: string
 /** Forget cached reads after commands or account changes; old requests stay isolated. */
 export function clearTaskCache(): void {
 	entries.clear();
+	epoch++;
 }

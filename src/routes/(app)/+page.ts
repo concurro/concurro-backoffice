@@ -1,3 +1,3 @@
 import { api } from '#lib/api/index.ts';
 
-export const load = () => ({ overview: api.overview() });
+export const load = () => ({ resource: api.overview() });

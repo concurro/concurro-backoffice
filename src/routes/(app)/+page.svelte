@@ -9,9 +9,10 @@
 	import Inline from '#lib/components/Inline.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import SavedData from '#lib/components/SavedData.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
-	import { MERGED_STAGES, PARKED_STAGES, taskStage, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
+	import { MERGED_STAGES, PARKED_STAGES, inTarget, taskStage, stageMeta, stepIndex, steps, type IconType } from '#lib/meta.ts';
 	import { session } from '#lib/api/index.ts';
 	import { needsYou } from '#lib/needs-you.ts';
 	import { withBase } from '#lib/paths.ts';
@@ -19,6 +20,7 @@
 	import type { NeedsYouItem, Stage, Target, Task, Tone } from '#lib/types.ts';
 
 	let { data }: PageProps = $props();
+	const view = $derived(data.resource.value);
 
 	const ACTIVE: Stage[] = ['intake', 'plan', 'plan_qc', 'implement', 'publish', 'review'];
 	const PARKED = PARKED_STAGES;
@@ -43,7 +45,7 @@
 	};
 
 	function stageCounts(target: Target, tasks: Task[]) {
-		const mine = tasks.filter((t) => t.owner === target.owner && t.repo === target.repo);
+		const mine = tasks.filter(inTarget(target));
 		const live = mine.filter((t) => !PARKED.includes(taskStage(t)) && !DONE.includes(t.stage));
 		return {
 			total: mine.length,
@@ -58,15 +60,20 @@
 
 <PageHeader title="Overview" subtitle="Everything Concurro is working on across your targets." />
 
-{#await data.overview}
+{#if !view && data.resource.error}
+	<ErrorState error={data.resource.error} retry={data.resource.refresh} />
+{:else if !view}
 	<div class="tiles">{#each { length: 4 } as _}<div class="tile"><Skeleton rows={2} /></div>{/each}</div>
 	<div class="split">
 		<Panel title="Needs you"><Skeleton rows={6} /></Panel>
 		<Panel title="Recent activity"><Skeleton rows={6} /></Panel>
 	</div>
 	<Panel title="Targets"><Skeleton height={120} /></Panel>
-{:then { tasks, targets, activity, issues }}
+{:else}
+	{@const { tasks, targets, activity, issues } = view}
 	{@const needs = needsYou(tasks)}
+	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
+	<SavedData resource={data.resource} label="list" />
 	<div class="tiles">
 		{#each tiles(tasks) as tile}
 			<div class="tile tone-{tile.tone}">
@@ -153,9 +160,7 @@
 
 	<IssueIntents {issues} />
 	<p class="sponsor-note muted"><Avatar login={session.me.login} size={16} /> Signed in as {session.me.login}. “Needs you” lists tasks you can approve, answer or sponsor.</p>
-{:catch error}
-	<ErrorState {error} />
-{/await}
+{/if}
 
 <style>
 	.tiles {

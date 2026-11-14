@@ -38,6 +38,7 @@ import type {
 	FindingStatus,
 	Role,
 	Stage,
+	Target,
 	Task,
 	Tone,
 	TurnOutcome,
@@ -176,3 +177,10 @@ export const stepHasRecord = (task: Task, i: number): boolean =>
 /** Fixed and obsolete findings are resolved; open and withdrawn ones block the merge whatever their severity. */
 export const isResolved = (status: FindingStatus) => status === 'fixed' || status === 'obsolete';
 export const openFindings = (findings: { status: FindingStatus }[]) => findings.filter((f) => !isResolved(f.status)).length;
+
+/** Repositories whose issues enroll in a target, as `owner/repo`. */
+export const issueRepositories = (target: Target) => target.issueRepositories ?? [`${target.owner}/${target.repo}`];
+
+/** Whether a task or issue belongs to a target. */
+export const inTarget = (target: Target) => (item: { owner: string; repo: string }) =>
+	issueRepositories(target).includes(`${item.owner}/${item.repo}`);

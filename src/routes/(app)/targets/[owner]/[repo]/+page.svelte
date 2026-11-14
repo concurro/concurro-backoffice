@@ -11,18 +11,27 @@
 	import Inline from '#lib/components/Inline.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import SavedData from '#lib/components/SavedData.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import Tabs from '#lib/components/Tabs.svelte';
 	import TaskSignals from '#lib/components/TaskSignals.svelte';
 	import { duration, relTime, taskHref } from '#lib/format.ts';
 	import { withBase } from '#lib/paths.ts';
-	import { PARKED_STAGES, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
-	import { profile } from '#lib/api/index.ts';
+	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
+	import { api, profile, session } from '#lib/api/index.ts';
 	import type { ActionsRun, Stage, Task, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
 	let tab = $state('issues');
+	/** What the overview already loaded for this target, shown until its own read arrives. */
+	const known = $derived.by(() => {
+		const name = `${params.owner}/${params.repo}`;
+		const target = session.targets.find((t) => [`${t.owner}/${t.repo}`, t.fork, ...issueRepositories(t)].includes(name));
+		return target && { target, tasks: session.tasks.filter(inTarget(target)), issues: session.issues.filter(inTarget(target)) };
+	});
+	const view = $derived(data.resource.value ?? known);
+	const runsData = $derived(tab === 'runs' ? api.targetRuns(params.owner, params.repo) : undefined);
 	let group = $state('all');
 
 	const groups: Record<string, { label: string; stages?: Stage[] }> = {
@@ -39,11 +48,16 @@
 
 <svelte:head><title>{params.owner}/{params.repo} · Concurro</title></svelte:head>
 
-{#await data.result}
+{#if !view && data.resource.error}
+	<ErrorState error={data.resource.error} retry={data.resource.refresh} />
+{:else if !view}
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
-{:then { target, tasks, runs, runsMessage, issues }}
+{:else}
+	{@const { target, tasks, issues } = view}
 	{@const prs = tasks.filter((t) => t.pr)}
+	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
+	<SavedData resource={data.resource} label="list" />
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
 		<span class="pair">
 			<span class="mono">{target.owner}/{target.repo}</span>
@@ -65,7 +79,7 @@
 		tabs={[
 			{ value: 'issues', label: 'Issues', count: tasks.length },
 			{ value: 'pulls', label: 'Pull requests', count: prs.length },
-			{ value: 'runs', label: 'Actions runs', count: runs.length },
+			{ value: 'runs', label: 'Actions runs' },
 			{ value: 'config', label: 'Configuration' }
 		]}
 	>
@@ -128,7 +142,16 @@
 					<EmptyState icon={GitPullRequest} title="No pull requests yet" text="Concurro opens a draft pull request from the fork when an implementation is published." />
 				{/if}
 			</Panel>
-		{:else if tab === 'runs'}
+		{:else if tab === 'runs' && !runsData?.value}
+			{#if runsData?.error}
+				<ErrorState error={runsData.error} retry={runsData.refresh} />
+			{:else}
+				<Panel title="Actions runs on the fork"><Skeleton rows={8} /></Panel>
+			{/if}
+		{:else if tab === 'runs' && runsData?.value}
+			{@const { runs, message: runsMessage } = runsData.value}
+			{#if runsData.error}<ErrorState error={runsData.error} retry={runsData.refresh} />{/if}
+			<SavedData resource={runsData} label="runs" />
 			<Panel flush title="Actions runs on the fork" meta={String(runs.length)}>
 				{#if runsMessage && runs.length}
 					<div class="notice"><Alert tone="warning" title="Some runs are missing">{runsMessage}</Alert></div>
@@ -186,9 +209,7 @@
 			</div>
 		{/if}
 	</Tabs>
-{:catch error}
-	<ErrorState {error} />
-{/await}
+{/if}
 
 <style>
 	.notice {

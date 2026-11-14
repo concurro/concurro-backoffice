@@ -151,6 +151,8 @@ export interface Target {
 	owner: string;
 	repo: string;
 	fork: string;
+	/** `owner/repo` of each repository whose issues enroll here; the upstream alone when absent. */
+	issueRepositories?: string[];
 	description: string;
 	mode: Mode;
 	defaultBranch: string;
@@ -285,23 +287,26 @@ export interface TaskCompletion {
 /** Independently loaded issue-page content. */
 export type TaskSection = 'intake' | 'plan' | 'design' | 'implement' | 'review' | 'handoff' | 'timeline' | 'pull';
 
+/** Freshness of data the API saved from GitHub; a list view reports its oldest list. */
+export interface ReadFreshness {
+	/** Time GitHub last supplied a complete verified snapshot. */
+	observedAt: string;
+	/** Whether the snapshot is due for refresh or its latest refresh failed. */
+	stale: boolean;
+	/** Whether the API is currently refreshing it. */
+	refreshing: boolean;
+	/** A recently posted command is awaiting its effect. */
+	pendingCommand?: boolean;
+	/** Public explanation of the latest failed refresh. */
+	error: string | null;
+}
+
 /** Issue summary and target configuration used by the page shell. */
 export interface TaskView {
 	/** Upstream writer authority for new task/provider commands. */
 	issueWriter: boolean;
-	/** Freshness of the persistent issue snapshot, when enabled by the API. */
-	cache?: {
-		/** Time GitHub last supplied a complete verified snapshot. */
-		observedAt: string;
-		/** Whether the snapshot is due for refresh or its latest refresh failed. */
-		stale: boolean;
-		/** Whether the API is currently refreshing this issue. */
-		refreshing: boolean;
-		/** A recently posted command is awaiting a checkpoint update. */
-		pendingCommand?: boolean;
-		/** Public explanation of the latest failed refresh. */
-		error: string | null;
-	};
+	/** Present when the API keeps a persistent issue snapshot. */
+	cache?: ReadFreshness;
 	/** Lightweight task metadata. */
 	task: Task;
 	/** Target metadata and model profiles. */
@@ -487,13 +492,28 @@ export interface ActionsRun {
 	durationS: number;
 }
 
-/** `GET /api/targets/{owner}/{repo}`; `runsMessage` says why the run list is empty. */
+/** `GET /api/overview`. */
+export interface Overview {
+	tasks: Task[];
+	issues: IssueIntent[];
+	targets: Target[];
+	activity: ActivityItem[];
+	cache?: ReadFreshness;
+}
+
+/** `GET /api/targets/{owner}/{repo}`. */
 export interface TargetView {
 	issues: IssueIntent[];
 	target: Target;
 	tasks: Task[];
+	cache?: ReadFreshness;
+}
+
+/** `GET /api/targets/{owner}/{repo}/runs`; `message` says why runs are missing. */
+export interface TargetRuns {
 	runs: ActionsRun[];
-	runsMessage: string | null;
+	message: string | null;
+	cache?: ReadFreshness;
 }
 
 export interface OperatorStatus {

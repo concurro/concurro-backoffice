@@ -2,7 +2,7 @@ import { cached, clearTaskCache } from './cache.svelte.ts';
 import { api as fixtures } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
 import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
+import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Overview, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
 import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
 
@@ -14,12 +14,16 @@ export const api = {
 		remember({ profiles });
 		return session.me;
 	},
-	async overview() {
-		const result = await fixtures.overview();
-		remember({ targets: result.targets, tasks: result.tasks, profiles });
-		return result;
+	/** Cache fixture lists just like live responses. */
+	overview() {
+		return cached<Overview>('overview', async () => {
+			const result = await fixtures.overview();
+			remember({ ...result, profiles });
+			return result;
+		});
 	},
-	target: fixtures.target,
+	target: (owner: string, repo: string) => cached<TargetView>(`target:${owner}/${repo}`, () => fixtures.target(owner, repo)),
+	targetRuns: (owner: string, repo: string) => cached<TargetRuns>(`runs:${owner}/${repo}`, () => fixtures.targetRuns(owner, repo)),
 	issue: fixtures.issue,
 	logoutStatus: async () => ({ remote: 'revoked' }),
 	task: fixtures.task,

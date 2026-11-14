@@ -12,7 +12,7 @@ const { js } = compileModule(javascript, { filename: 'cache.svelte.js', generate
 const output = new URL('../.svelte-kit/cache-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, js.code);
-const { cached, clearTaskCache } = await import(output.href);
+const { cached, cacheEpoch, clearTaskCache } = await import(output.href);
 
 test('concurrent navigation shares one read and reuses fresh content', async () => {
 	clearTaskCache();
@@ -113,4 +113,10 @@ test('new revisions replace a section slot and isolate late obsolete responses',
 	assert.equal(cached('section:task:plan', async () => 'wrong', 'r2'), current);
 	assert.equal(current.value, 'current plan');
 	assert.equal(cached('section:other:plan', async () => 'wrong', 'r1'), other);
+});
+
+test('a cache clear tells reads begun before it that their result is obsolete', () => {
+	const before = cacheEpoch();
+	clearTaskCache();
+	assert.notEqual(cacheEpoch(), before);
 });

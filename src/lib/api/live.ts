@@ -1,6 +1,6 @@
-import { cached, clearTaskCache } from './cache.svelte.ts';
+import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { ActivityItem, Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Target, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import type { Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Overview, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -42,14 +42,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const path = (owner: string, repo: string, issue?: number) =>
 	`${encodeURIComponent(owner)}/${encodeURIComponent(repo)}` + (issue === undefined ? '' : `/${issue}`);
 
-const OVERVIEW_SECONDS = 10;
-let overviewCache: { at: number; promise: Promise<Overview> } | null = null;
-
-interface Overview {
-	tasks: Task[];
-	issues: IssueIntent[];
-	targets: Target[];
-	activity: ActivityItem[];
+/** Read the overview; a read that a command or account change outdated leaves the session's lists alone. */
+async function readOverview(): Promise<Overview> {
+	const epoch = cacheEpoch();
+	const result = await request<Overview>('GET', '/api/overview');
+	if (epoch === cacheEpoch()) remember(result);
+	return result;
 }
 
 export const api = {
@@ -59,23 +57,18 @@ export const api = {
 		session.me = me;
 		return session.me;
 	},
-	/** Shared for a few seconds, so the layout and the overview page make one request. */
-	overview(): Promise<Overview> {
-		if (!overviewCache || Date.now() - overviewCache.at > OVERVIEW_SECONDS * 1000) {
-			const promise = request<Overview>('GET', '/api/overview').then((result) => {
-				remember(result);
-				return result;
-			});
-			promise.catch(() => (overviewCache = null));
-			overviewCache = { at: Date.now(), promise };
-		}
-		return overviewCache.promise;
+	/** List reads survive navigation and refresh in the background when stale. */
+	overview: () => cached('overview', readOverview),
+	target(owner: string, repo: string) {
+		return cached(`target:${path(owner, repo)}`, async () => {
+			const result = await request<TargetView>('GET', `/api/targets/${path(owner, repo)}`);
+			remember({ profiles: result.target.profiles });
+			return result;
+		});
 	},
-	async target(owner: string, repo: string): Promise<TargetView> {
-		const result = await request<TargetView>('GET', `/api/targets/${path(owner, repo)}`);
-		remember({ profiles: result.target.profiles });
-		return result;
-	},
+	/** Load a target's Actions runs only when their tab is opened. */
+	targetRuns: (owner: string, repo: string) =>
+		cached(`runs:${path(owner, repo)}`, () => request<TargetRuns>('GET', `/api/targets/${path(owner, repo)}/runs`)),
 	async task(owner: string, repo: string, issue: number): Promise<{ task: Task; target: Target; issueWriter: boolean }> {
 		const result = await request<{ task: Task; target: Target; issueWriter: boolean }>('GET', `/api/tasks/${path(owner, repo, issue)}`);
 		remember({ profiles: result.target.profiles });
@@ -108,7 +101,7 @@ export const api = {
 	async credentials(): Promise<{ routes: CredentialRoute[]; targets: Target[]; usage: UsageRow[] }> {
 		const [result, overview] = await Promise.all([
 			request<{ routes: CredentialRoute[]; usage: UsageRow[] }>('GET', '/api/me/credentials'),
-			session.targets.length ? Promise.resolve({ targets: session.targets }) : api.overview()
+			session.targets.length ? Promise.resolve({ targets: session.targets }) : readOverview()
 		]);
 		return { ...result, targets: overview.targets };
 	},
@@ -127,7 +120,6 @@ export const actions = {
 		const argument = (['approve', 'retry', 'sponsor', 'withdraw', 'funding'].includes(command)) && arg ? arg : undefined;
 		const result = await request<{ posted: string; actor: string }>('POST', `/api/repos/${path(task.owner, task.repo)}/issues/${task.issue}/commands`, { command, argument });
 		clearTaskCache();
-		overviewCache = null;
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
     async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}): Promise<CredentialRoute> {
@@ -139,9 +131,8 @@ export const actions = {
 	async signOut(): Promise<{ remote: string }> {
         const result = await request<{ remote: string }>('POST', '/auth/logout');
         clearTaskCache();
-        overviewCache = null;
         session.me = { login: '', name: '' };
-        session.targets = []; session.tasks = []; session.profiles = {};
+        session.targets = []; session.tasks = []; session.issues = []; session.profiles = {};
         return result;
     }
 };
