@@ -117,3 +117,10 @@ Personal API-key and CLI-token forms validate, replace and revoke credentials on
 Contributed tasks use selected personal credentials without organization fallback. GitHub
 sign-out reports local completion separately from remote access-token cleanup. Nonwriters
 retain identity-bound self-withdrawal and their own consent view, not full target/task data.
+
+Issue funding controls select organization or personal credentials independently for each
+provider. “Use my credentials” posts `funding` with `<provider> personal`; organization selection
+uses `<provider> org`. Both require upstream write permission. Withdrawal keeps the selected
+personal payer policy and pauses without coverage; it never falls back to organization funding.
+Current provider choices, prospective consent and historical charged attempts remain separate
+in live and mock modes.

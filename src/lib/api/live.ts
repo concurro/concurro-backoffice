@@ -124,7 +124,7 @@ export const api = {
 export const actions = {
 	/** Sends the command; Concurro posts it on the issue as the user's command. Returns toast text. */
 	async command(task: IssueRef, command: Command, arg = ''): Promise<string> {
-		const argument = (['approve', 'retry', 'sponsor', 'withdraw'].includes(command)) && arg ? arg : undefined;
+		const argument = (['approve', 'retry', 'sponsor', 'withdraw', 'funding'].includes(command)) && arg ? arg : undefined;
 		const result = await request<{ posted: string; actor: string }>('POST', `/api/repos/${path(task.owner, task.repo)}/issues/${task.issue}/commands`, { command, argument });
 		clearTaskCache();
 		overviewCache = null;

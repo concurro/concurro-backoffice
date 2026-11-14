@@ -24,7 +24,7 @@ export type Provider = 'anthropic' | 'openai';
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 export type AlertTone = 'note' | 'tip' | 'warning' | 'caution';
 export type CiStatus = 'passing' | 'failing' | 'pending' | 'none' | 'unknown';
-export type Command = 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor' | 'withdraw';
+export type Command = 'funding' | 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor' | 'withdraw';
 
 export interface ModelProfile {
 	name: string;
@@ -110,7 +110,11 @@ export interface Sponsorship {
     /** Sanitized own transition receipts and withdrawal cutoffs. */
     history?: { transition?: string; provider?: string; reason?: string; cutoff?: number | null }[];
 
-    funding?: 'org' | 'contributed' | 'unknown';
+    funding?: 'org' | 'contributed' | 'mixed' | 'unknown';
+    /** Confirmed payer choices for future admissions, independent of consent and historical debits. */
+    provider_funding?: Partial<Record<Provider, 'org' | 'contributed'>>;
+    /** Validated pending transition choices, overlaid on adopted provider funding. */
+    source_provider_funding?: Partial<Record<Provider, 'org' | 'contributed'>>;
     /** Actual task stage and total attempts; absent before enrollment. */
     task_stage?: string | null;
     calls?: number;
@@ -126,6 +130,7 @@ export interface Sponsorship {
     status: string;
     task_status?: string | null;
     slots: Partial<Record<Provider, SponsorSlot>>;
+    /** Adopted owners overlaid with validated pending provider transitions. */
     source_slots?: Partial<Record<Provider, SponsorSlot>>;
     coverage?: Partial<Record<Provider, CredentialRequirement[]>>;
     pending?: string[];

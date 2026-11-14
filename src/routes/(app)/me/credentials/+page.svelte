@@ -68,7 +68,7 @@
 </script>
 
 <svelte:head><title>My credentials · Concurro</title></svelte:head>
-<PageHeader title="My credentials" subtitle="Write-only personal credentials for provider sponsorship. Configured contributed tasks use exact admitted versions; organization-funded sessions keep their organization credentials." />
+<PageHeader title="My credentials" subtitle="Write-only personal credentials for provider sponsorship. Issues select organization or personal credentials separately for each provider. Admitted calls retain their exact credential versions." />
 {#await data.result}<Skeleton rows={8} />{:then { routes, targets }}
 	<div class="routes">
 		{#each routes as route (route.id)}

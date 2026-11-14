@@ -53,7 +53,7 @@ export const api = {
 			return { task, turns: turnsFor(task) };
 		}),
 	credentials: () => delay(() => ({ routes: store.credentials, targets, usage })),
-	sponsorships: () => delay(() => [...store.tasks, ...store.issues].filter((t) => Object.values(t.sponsorships?.slots ?? {}).some((s) => s?.sponsor_id === String(MOCK_ACTOR_ID)))),
+	sponsorships: () => delay(() => [...store.tasks, ...store.issues].filter((t) => Object.values(t.sponsorships?.slots ?? {}).some((s) => s?.sponsor_id === String(MOCK_ACTOR_ID)) || t.sponsorships?.facts?.some((f) => f.actor_id === String(MOCK_ACTOR_ID)))),
 	operator: () => delay(() => operator),
 	/** Synchronous index for the command palette. */
 	index: () => ({ targets, tasks: store.tasks })

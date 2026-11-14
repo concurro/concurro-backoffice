@@ -5,7 +5,7 @@ import type { Command, CredentialCandidate, CredentialRouteId, IssueIntent, Issu
 
 /** In-browser mock state. Mutations stay local; nothing leaves the page. */
 for (const task of tasks) {
-    task.sponsorships = { funding: 'org', status: 'confirmed', slots: {
+    task.sponsorships = { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: {
         openai: { sponsor_id: task.sponsor === ME ? String(MOCK_ACTOR_ID) : '84', login: task.sponsor || 'jvoss', status: 'active', epoch: 1 },
         anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active', epoch: 1 }
     }};
@@ -13,7 +13,8 @@ for (const task of tasks) {
     task.sponsorships.task_stage = task.stage;
     task.sponsorships.charged_calls = [{ id: 'mock-org-' + task.issue, kind: 'org', provider: null, calls: task.budgets.modelCalls.used }];
     if (task.paused) {
-        task.sponsorships.funding = 'contributed';
+        task.sponsorships.funding = 'mixed';
+        task.sponsorships.provider_funding = { openai: 'contributed', anthropic: 'org' };
         task.sponsorships.task_stage = task.paused;
         task.sponsorships.recovery = { eligible: task.paused === 'awaiting_credentials' && task.budgets.modelCalls.used < task.budgets.modelCalls.max, not_before: Date.now() / 1000 + 90 };
         const requirements = targets.find((target) => target.owner === task.owner && target.repo === task.repo)?.credentialRequirements ?? [];
@@ -35,7 +36,7 @@ for (const task of tasks) {
         task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Validated replacement credentials can schedule recovery after current consent, required coverage, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
     }
 }
-export const store = $state({ tasks, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
+export const store = $state({ tasks, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
 
 let seq = 0;
 const now = () => new Date().toISOString();
@@ -55,14 +56,32 @@ function move(task: Task, stage: Stage, title: string, body: string, tone: Task[
 export function runCommand(issue: IssueRef, command: Command, arg = ''): string {
     const item = [...store.tasks, ...store.issues].find((t) => t.owner === issue.owner && t.repo === issue.repo && t.issue === issue.issue);
     if (!item) throw new Error('Issue is not visible.');
+    if (command === 'funding') {
+        const [provider, funding] = arg.split(' ');
+        if (!['openai', 'anthropic'].includes(provider) || !['org', 'personal'].includes(funding)) throw new Error('Unknown provider funding selection.');
+        item.sponsorships ??= { funding: 'org', status: 'confirmed', slots: {} };
+        const projection = item.sponsorships;
+        projection.provider_funding ??= { openai: projection.funding === 'contributed' ? 'contributed' : 'org', anthropic: projection.funding === 'contributed' ? 'contributed' : 'org' };
+        projection.facts ??= [];
+        projection.facts.push({ actor_id: String(MOCK_ACTOR_ID), provider: provider as Provider, command: 'funding' });
+        projection.provider_funding[provider as Provider] = funding === 'personal' ? 'contributed' : 'org';
+        projection.funding = projection.provider_funding.openai === projection.provider_funding.anthropic ? projection.provider_funding.openai : 'mixed';
+        if (funding === 'personal') {
+            const old = projection.slots[provider as Provider];
+            projection.slots[provider as Provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
+        }
+        return `Selected ${funding === 'personal' ? 'your personal' : 'organization'} credentials for future ${provider} calls.`;
+    }
     if (command === 'sponsor' || command === 'withdraw') {
         if (!['openai', 'anthropic'].includes(arg)) return 'Usage: /concurro sponsor openai | anthropic';
         const provider = arg as Provider;
-        item.sponsorships ??= { funding: 'org', status: 'confirmed', slots: {} };
+        item.sponsorships ??= { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: {} };
+        item.sponsorships.facts ??= [];
+        item.sponsorships.facts.push({ actor_id: String(MOCK_ACTOR_ID), provider, command });
         const old = item.sponsorships.slots[provider];
         if (command === 'sponsor') item.sponsorships.slots[provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
         else if (old?.sponsor_id === String(MOCK_ACTOR_ID)) item.sponsorships.slots[provider] = { sponsor_id: null, status: 'withdrawn', epoch: (old.epoch ?? 0) + 1 };
-        return `Posted /concurro ${command} ${provider} for @${ME}. Funding follows the issue’s configured policy.`;
+        return `Posted /concurro ${command} ${provider} for @${ME}. The provider funding selection is unchanged.`;
     }
     const task = store.tasks.find((t) => t === item);
     if (!task) throw new Error('This demo issue is not enrolled.');
@@ -120,7 +139,7 @@ export function saveCredential(id: CredentialRouteId, secret: string, candidate:
 	route.note = undefined;
     for (const task of store.tasks) {
         const projection = task.sponsorships;
-        if (projection?.funding !== 'contributed' || projection.task_stage !== 'awaiting_credentials' || !projection.recovery?.eligible || projection.slots[route.provider]?.sponsor_id !== String(MOCK_ACTOR_ID)) continue;
+        if (projection?.provider_funding?.[route.provider] !== 'contributed' || projection.task_stage !== 'awaiting_credentials' || !projection.recovery?.eligible || projection.slots[route.provider]?.sponsor_id !== String(MOCK_ACTOR_ID)) continue;
         projection.coverage?.[route.provider]?.forEach((requirement) => {
             if (requirement.route === route.route) { requirement.status = route.models?.includes(requirement.model) ? 'available' : 'missing_model'; requirement.version = route.version; }
         });
