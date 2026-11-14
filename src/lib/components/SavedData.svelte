@@ -30,4 +30,6 @@
 	<p class="muted" role="status">Command sent. Waiting for the {label} to update…</p>
 {:else if saved?.refreshing}
 	<p class="muted" role="status">Refreshing {label}… Showing the snapshot from {relTime(saved.observedAt)}.</p>
+{:else if saved?.state === 'catching-up'}
+	<p class="muted" role="status">Concurro is checking for missed updates{saved.verified ? `; last verified ${relTime(saved.verified)}` : ''}.</p>
 {/if}

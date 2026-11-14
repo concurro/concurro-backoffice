@@ -122,6 +122,10 @@ export const actions = {
 		clearTaskCache();
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},
+	/** Have every list of a target read from GitHub again. */
+	async refreshTarget(owner: string, repo: string): Promise<void> {
+		await request('POST', `/api/targets/${path(owner, repo)}/refresh`);
+	},
     async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}): Promise<CredentialRoute> {
         return request<CredentialRoute>('PUT', '/api/me/credentials/' + id, { secret, ...candidate });
     },

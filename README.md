@@ -57,7 +57,7 @@ commit with `bash deploy/deploy.sh web FULL_COMMIT_SHA` from
 | ---- | ---- |
 | `/signin` | Sign-in |
 | `/` | Overview |
-| `/targets/[owner]/[repo]` | Target: issues, pull requests, Actions runs, configuration |
+| `/targets/[owner]/[repo]` | Target: issues, pull requests, Actions runs, configuration; writers can refresh its lists from GitHub in the `…` menu |
 | `/tasks/[owner]/[repo]/[issue]` | Task detail |
 | `/issues/[owner]/[repo]/[issue]` | Provider consent before task enrollment |
 | `/tasks/[owner]/[repo]/[issue]/turns/[turn]` | Run diagnostics |

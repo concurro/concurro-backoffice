@@ -120,3 +120,22 @@ test('a cache clear tells reads begun before it that their result is obsolete', 
 	clearTaskCache();
 	assert.notEqual(cacheEpoch(), before);
 });
+
+test('a reload during a pending read runs exactly one more read', async () => {
+	clearTaskCache();
+	let calls = 0;
+	let complete;
+	const resource = cached('target', () => { calls += 1; return calls === 1 ? new Promise((resolve) => { complete = resolve; }) : Promise.resolve('after'); });
+	await setImmediate();
+	assert.equal(resource.refresh(), false);
+	resource.reload();
+	resource.reload();
+	complete('before');
+	await setImmediate();
+	await setImmediate();
+	assert.equal(calls, 2);
+	assert.equal(resource.value, 'after');
+	resource.reload();
+	await setImmediate();
+	assert.equal(calls, 3, 'with nothing in flight a reload reads at once');
+});

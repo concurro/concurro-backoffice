@@ -73,6 +73,8 @@ export const actions = {
         clearTaskCache();
         return message;
     },
+	/** Fixtures have no GitHub behind them; the views simply reload. */
+	async refreshTarget(_owner: string, _repo: string) {},
 	async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
 		try { saveCredential(id, secret, candidate); }
 		catch (error) { throw new ApiError(422, error instanceof Error ? error.message : 'Synthetic validation failed.'); }

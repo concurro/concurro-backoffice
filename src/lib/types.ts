@@ -299,6 +299,10 @@ export interface ReadFreshness {
 	pendingCommand?: boolean;
 	/** Public explanation of the latest failed refresh. */
 	error: string | null;
+	/** With the service's list index: whether it has verified that it missed no change. */
+	state?: 'current' | 'catching-up' | 'unavailable';
+	/** When the index last verified its lists against GitHub's delivery history. */
+	verified?: string | null;
 }
 
 /** Issue summary and target configuration used by the page shell. */

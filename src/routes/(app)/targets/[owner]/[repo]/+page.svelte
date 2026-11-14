@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ArrowLeftRight, GitBranch, GitPullRequest, Lock, PlayCircle } from 'lucide-svelte';
+	import { DropdownMenu } from 'bits-ui';
+	import { ArrowLeftRight, Ellipsis, GitBranch, GitPullRequest, Lock, PlayCircle, RefreshCw } from 'lucide-svelte';
 	import IssueIntents from '#lib/components/IssueIntents.svelte';
 	import Alert from '#lib/components/Alert.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
@@ -18,7 +19,8 @@
 	import { duration, relTime, taskHref } from '#lib/format.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
-	import { api, profile, session } from '#lib/api/index.ts';
+	import { actions as writes, api, profile, session } from '#lib/api/index.ts';
+	import { toast } from '#lib/state/toast.svelte.ts';
 	import type { ActionsRun, Stage, Task, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
@@ -43,6 +45,17 @@
 	};
 	const inGroup = (tasks: Task[]) => tasks.filter((t) => groups[group].stages?.includes(taskStage(t)) ?? true).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
+	async function refreshFromGitHub() {
+		try {
+			await writes.refreshTarget(params.owner, params.repo);
+			// The overview holds the same lists, and a read already in flight may predate the refresh.
+			for (const resource of [data.resource, runsData, api.overview()]) resource?.reload();
+			toast('Reading this target from GitHub again.');
+		} catch (error) {
+			toast(error instanceof Error ? error.message : 'The refresh could not be requested.', 'danger');
+		}
+	}
+
 	const runTone: Record<ActionsRun['status'], Tone> = { success: 'success', failure: 'danger', in_progress: 'info', queued: 'neutral', cancelled: 'warning' };
 </script>
 
@@ -59,6 +72,18 @@
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<SavedData resource={data.resource} label="list" />
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
+		{#snippet actions()}
+			{#if target.writer}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger class="more-trigger" aria-label="More actions"><Ellipsis size={16} aria-hidden="true" /></DropdownMenu.Trigger>
+					<DropdownMenu.Portal>
+						<DropdownMenu.Content class="user-menu" align="end" sideOffset={6}>
+							<DropdownMenu.Item class="menu-item" onSelect={refreshFromGitHub}><RefreshCw size={14} aria-hidden="true" /><span>Refresh from GitHub</span></DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Portal>
+				</DropdownMenu.Root>
+			{/if}
+		{/snippet}
 		<span class="pair">
 			<span class="mono">{target.owner}/{target.repo}</span>
 			<ArrowLeftRight size={14} aria-label="forked to" />
@@ -212,6 +237,18 @@
 {/if}
 
 <style>
+	:global(.more-trigger) {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		color: var(--text-2);
+		cursor: pointer;
+	}
 	.notice {
 		padding: var(--s-3) var(--s-4) 0;
 	}

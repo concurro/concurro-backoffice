@@ -9,6 +9,7 @@ export class Resource<T> {
 	/** Time of the last successful read. */
 	updated = 0;
 	private pending = false;
+	private again = false;
 
 	/** Bind the read performed by initial loading and explicit retries. */
 	constructor(private readonly load: () => Promise<T>) {}
@@ -28,9 +29,18 @@ export class Resource<T> {
 			} finally {
 				this.pending = false;
 				this.loading = false;
+				if (this.again) {
+					this.again = false;
+					this.refresh();
+				}
 			}
 		});
 		return true;
+	};
+
+	/** Read again now, or once more after the read in flight, whose answer may predate the reason for asking. */
+	reload = () => {
+		if (!this.refresh()) this.again = true;
 	};
 }
 
