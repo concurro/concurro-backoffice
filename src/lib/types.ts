@@ -300,7 +300,7 @@ export interface ReadFreshness {
 	/** Public explanation of the latest failed refresh. */
 	error: string | null;
 	/** With the service's list index: whether it has verified that it missed no change. */
-	state?: 'current' | 'catching-up' | 'unavailable';
+	state?: 'current' | 'catching-up' | 'rebuilding' | 'failed' | 'unavailable';
 	/** When the index last verified its lists against GitHub's delivery history. */
 	verified?: string | null;
 }
