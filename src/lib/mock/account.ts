@@ -9,18 +9,18 @@ export const credentials: CredentialRoute[] = [
 		kind: 'API key',
 		status: 'valid',
 		fingerprint: 'sk-ant-…9f3a',
-		lastValidated: ago(3 * H),
-		lastUsed: ago(14), route: 'anthropic-api-key', models: ['claude-opus-5-5'], registrationAvailable: true
+		lastUpdated: ago(3 * H),
+		lastUsed: ago(14), route: 'anthropic-api-key', registrationAvailable: true
 	},
-	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', route: 'claude-subscription', registrationAvailable: true, note: 'Sign in locally with the CLI, then paste the token. Validation uses your provider usage.' },
+	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', route: 'claude-subscription', registrationAvailable: true, note: 'Sign in locally with the CLI, then paste the token. Token problems are reported during execution.' },
 	{
 		id: 'openai_api',
 		label: 'OpenAI API key',
 		provider: 'openai',
 		kind: 'API key',
-		status: 'exhausted', route: 'openai-api-key', models: ['gpt-6.1-sol'], registrationAvailable: true,
+		status: 'exhausted', route: 'openai-api-key', registrationAvailable: true,
 		fingerprint: 'sk-…41d7',
-		lastValidated: ago(5 * H),
+		lastUpdated: ago(5 * H),
 		lastUsed: ago(5 * H),
 		note: 'Synthetic quota status. Each task follows its configured funding policy.'
 	},

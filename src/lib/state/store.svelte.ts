@@ -34,7 +34,7 @@ for (const task of tasks) {
             { request: 'synthetic-provider', source: 'provider', completed: true, category: null, usage: { input_tokens: 2, output_tokens: 3 }, binding: { sponsorship_provider: 'anthropic', sponsor: '84', credential_version: 1 } }
         ];
         task.stage = task.paused;
-        task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Validated replacement credentials can schedule recovery after current consent, required coverage, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
+        task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Saved replacement credentials can schedule recovery after current consent, required coverage, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
     }
 }
 export const store = $state({ tasks, reviews, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
@@ -141,35 +141,34 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
 	}
 }
 
-/** Simulate candidate validation without retaining token/account inputs. */
+/** Simulate credential storage without retaining token/account inputs. */
 export function saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
 	const route = store.credentials.find((c) => c.id === id)!;
 	if (!secret.trim()) throw new Error('Enter a credential.');
-    if (route.kind === 'Subscription' && !candidate.models?.some((model) => model.trim())) throw new Error('Select models to validate.');
     if (id === 'chatgpt_subscription' && !candidate.account_id?.trim()) throw new Error('Enter the ChatGPT account ID.');
-    if (secret === 'synthetic-rejected') throw new Error('Synthetic provider rejection; previous version preserved.');
 	route.status = 'valid';
+    route.statusReason = 'stored';
     route.version = (route.version ?? 0) + 1;
     route.expiryKnown = false;
     route.expiresAt = null;
-    if (route.kind === 'Subscription') route.models = [...new Set(candidate.models?.map((model) => model.trim()))];
     route.accountLabel = id === 'chatgpt_subscription' ? 'Supplied ChatGPT account (mock)' : null;
     route.accountVerified = false;
 	route.fingerprint = 'sha256:mock-' + secret.length;
-	route.lastValidated = now();
+	route.lastUpdated = now();
 	route.note = undefined;
     for (const task of store.tasks) {
         const projection = task.sponsorships;
         if (projection?.provider_funding?.[route.provider] !== 'contributed' || projection.task_stage !== 'awaiting_credentials' || !projection.recovery?.eligible || projection.slots[route.provider]?.sponsor_id !== String(MOCK_ACTOR_ID)) continue;
         projection.coverage?.[route.provider]?.forEach((requirement) => {
-            if (requirement.route === route.route) { requirement.status = route.models?.includes(requirement.model) ? 'available' : 'missing_model'; requirement.version = route.version; }
+            if (requirement.route === route.route) { requirement.status = 'available'; requirement.version = route.version; }
         });
-        if (Object.values(projection.coverage ?? {}).flat().every((requirement) => requirement.status === 'available')) projection.recovery.delivery = { id: 'mock-validation-' + route.version, due_at: Math.max(Date.now() / 1000, projection.recovery.not_before) };
+        if (Object.values(projection.coverage ?? {}).flat().every((requirement) => requirement.status === 'available')) projection.recovery.delivery = { id: 'mock-save-' + route.version, due_at: Math.max(Date.now() / 1000, projection.recovery.not_before) };
     }
 }
 
 export function revokeCredential(id: CredentialRouteId) {
 	const route = store.credentials.find((c) => c.id === id)!;
 	route.status = 'revoked';
+    route.lastUpdated = now();
 	route.note = 'Stored personal credential revoked. Current org-paid calls are unaffected.';
 }

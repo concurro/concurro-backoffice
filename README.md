@@ -137,3 +137,5 @@ uses `<provider> org`. Both require upstream write permission. Withdrawal keeps 
 personal payer policy and pauses without coverage; it never falls back to organization funding.
 Current provider choices, prospective consent and historical charged attempts remain separate
 in live and mock modes.
+
+Personal credentials are saved without provider validation or model selection. The configured task model is used during execution, where authentication and model-access errors follow the normal credential recovery flow. Saving a replacement retires the previous version.

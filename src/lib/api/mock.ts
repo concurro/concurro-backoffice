@@ -95,7 +95,7 @@ export const actions = {
 	async refreshTarget(_owner: string, _repo: string) {},
 	async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
 		try { saveCredential(id, secret, candidate); }
-		catch (error) { throw new ApiError(422, error instanceof Error ? error.message : 'Synthetic validation failed.'); }
+		catch (error) { throw new ApiError(422, error instanceof Error ? error.message : 'Synthetic save failed.'); }
 		return store.credentials.find((c) => c.id === id)!;
 	},
 	async revokeCredential(id: CredentialRouteId) {

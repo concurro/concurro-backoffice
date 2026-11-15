@@ -142,7 +142,7 @@ export const reviewVerdictMeta = (verdict: string): Meta => verdictMeta[verdict 
 
 export const credentialMeta: Record<CredentialStatus, Meta> = {
 	invalid: { label: 'Invalid', tone: 'danger', icon: CircleX },
-	valid: m('Valid', 'success', CircleCheck),
+	valid: m('Saved', 'success', CircleCheck),
 	expired: m('Expired', 'warning', Clock),
 	exhausted: m('Exhausted', 'danger', CircleAlert),
 	revoked: m('Revoked', 'neutral', Ban),

@@ -432,10 +432,8 @@ export type CredentialRouteId =
 	| 'chatgpt_subscription';
 export type CredentialStatus = 'valid' | 'invalid' | 'expired' | 'exhausted' | 'revoked' | 'missing';
 
-/** Write-only candidate metadata; model defaults come from configured route requirements. */
+/** Write-only candidate metadata for credential storage. */
 export interface CredentialCandidate {
-    /** Distinct models validated atomically with this token. */
-    models?: string[];
     /** Supplied ChatGPT account header; not authenticated account identity. */
     account_id?: string;
 }
@@ -447,12 +445,11 @@ export interface CredentialRoute {
 	kind: 'API key' | 'Subscription';
 	status: CredentialStatus;
 	fingerprint?: string;
-	lastValidated?: string;
+	lastUpdated?: string;
 	lastUsed?: string;
 	note?: string;
     route?: string | null;
     registrationAvailable?: boolean;
-    models?: string[] | null;
     version?: number;
     expiresAt?: string | null;
     expiryKnown?: boolean;
