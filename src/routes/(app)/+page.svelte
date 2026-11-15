@@ -21,6 +21,8 @@
 
 	let { data }: PageProps = $props();
 	const view = $derived(data.resource.value);
+	// Displayed while loading and after a failure too, so no live change is missed.
+	$effect(() => data.resource.watch());
 
 	const ACTIVE: Stage[] = ['intake', 'plan', 'plan_qc', 'implement', 'publish', 'review'];
 	const PARKED = PARKED_STAGES;

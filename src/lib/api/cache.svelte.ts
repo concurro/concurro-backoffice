@@ -10,6 +10,7 @@ export class Resource<T> {
 	updated = 0;
 	private pending = false;
 	private again = false;
+	private watchers = 0;
 
 	/** Bind the read performed by initial loading and explicit retries. */
 	constructor(private readonly load: () => Promise<T>) {}
@@ -42,6 +43,24 @@ export class Resource<T> {
 	reload = () => {
 		if (!this.refresh()) this.again = true;
 	};
+
+	/** Mark the read as displayed, loaded or not, until the returned function is called; a displayed read follows live changes. */
+	watch = () => {
+		this.watchers += 1;
+		return () => {
+			this.watchers -= 1;
+		};
+	};
+
+	/**
+	 * The content changed at its source. A read in flight may predate the change, so it is
+	 * followed by one more; otherwise the content is read again now if displayed, or when next used.
+	 */
+	outdate = () => {
+		this.updated = 0;
+		if (this.pending) this.again = true;
+		else if (this.watchers) this.refresh();
+	};
 }
 
 let epoch = 0;
@@ -61,6 +80,11 @@ export function cached<T>(key: string, load: () => Promise<T>, revision?: string
 	}
 	if (Date.now() - resource.updated > FRESH_MS) resource.refresh();
 	return resource;
+}
+
+/** Outdate every cached read whose key `concerns` selects, as a live change does. */
+export function outdate(concerns: (key: string) => boolean): void {
+	for (const [key, entry] of entries) if (concerns(key)) entry.resource.outdate();
 }
 
 /** Forget cached reads after commands or account changes; old requests stay isolated. */

@@ -1,6 +1,7 @@
 import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
 import type { Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Overview, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import { follow, type ChangeSource } from './events.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export class ApiError extends Error {
@@ -49,6 +50,9 @@ async function readOverview(): Promise<Overview> {
 	if (epoch === cacheEpoch()) remember(result);
 	return result;
 }
+
+/** Follow live changes for as long as the app shell is shown. */
+export const followChanges = () => follow(() => new EventSource(`${base}/api/events`) as unknown as ChangeSource);
 
 export const api = {
 	async me(): Promise<Me> {

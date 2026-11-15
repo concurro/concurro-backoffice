@@ -3,6 +3,7 @@ import { api as fixtures } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
 import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
 import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Overview, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
+import { apply } from './events.ts';
 import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
 
@@ -66,11 +67,15 @@ export const api = {
 	index: fixtures.index
 };
 
+/** Fixtures have no stream behind them: changes come from commands applied in the browser. */
+export const followChanges = () => () => {};
+
 export const actions = {
     /** Apply issue commands before invalidating independently loaded fixture views. */
     async command(task: IssueRef, command: Command, arg = '') {
         const message = runCommand(task, command, arg);
         clearTaskCache();
+        apply({ kind: 'tasks', repository: `${task.owner}/${task.repo}`, issue: task.issue, targets: [] });
         return message;
     },
 	/** Fixtures have no GitHub behind them; the views simply reload. */

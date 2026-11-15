@@ -25,6 +25,19 @@ live PR/CI data independently. Unvisited phases do not fetch report bodies. Retu
 an issue reuses cached content; entries older than ten seconds refresh in the background.
 Commands and account changes clear the cache. Each failed section has its own retry.
 
+## Live updates
+
+The app shell keeps one `EventSource` open on `/api/events` (`src/lib/api/events.ts`). Each
+event names what changed; `src/lib/api/changes.ts` maps it to the cached reads it outdates:
+a task's progress to the overview and that task's summary, a list change to the overview and
+the target pages concerned, a runs change to those targets' runs, and a change of how current
+Concurro's lists are to all three. A page marks the read it displays with `Resource.watch`,
+through loading and error states. A displayed read is read again at once; a read in flight,
+displayed or not, is followed by one more; any other is read again when next used. Missed events are not replayed, so every time the stream
+opens, the first included, everything is outdated. The browser reconnects a dropped stream
+itself; one the server refused is opened again after 5 seconds, doubling up to a minute.
+Fixture mode has no stream: its commands apply the same change in the browser.
+
 The summary retains current-plan identity and phase-presence metadata, so the stepper and
 commands do not depend on historical bodies. Revision changes refresh the summary before
 new phase data is displayed. CI and diff counts remain unavailable until their reads finish.
@@ -41,7 +54,7 @@ npm run dev        # proxies /concurro/api and /concurro/auth to the backoffice 
 `npm run dev` expects the backoffice API at `http://127.0.0.1:8788` (override with `CONCURRO_API`).
 The app is served under `/concurro`; `CONCURRO_BASE=` serves it at the root.
 
-`npm test` checks navigation-cache behavior. `npm run check` type-checks the project. `npm run build` produces the static build;
+`npm test` checks navigation-cache and live-update behavior. `npm run check` type-checks the project. `npm run build` produces the static build;
 `npm run build:mock` builds the fixture version.
 
 ## Release

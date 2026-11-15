@@ -2,8 +2,10 @@
 	import CommandPalette from '#lib/components/CommandPalette.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import Topbar from '#lib/components/Topbar.svelte';
+	import { followChanges } from '#lib/api/index.ts';
 
 	let { children } = $props();
+	$effect(() => followChanges());
 </script>
 
 <a class="skip" href="#main">Skip to content</a>

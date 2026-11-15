@@ -12,7 +12,7 @@ const { js } = compileModule(javascript, { filename: 'cache.svelte.js', generate
 const output = new URL('../.svelte-kit/cache-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, js.code);
-const { cached, cacheEpoch, clearTaskCache } = await import(output.href);
+const { cached, cacheEpoch, clearTaskCache, outdate } = await import(output.href);
 
 test('concurrent navigation shares one read and reuses fresh content', async () => {
 	clearTaskCache();
@@ -138,4 +138,65 @@ test('a reload during a pending read runs exactly one more read', async () => {
 	resource.reload();
 	await setImmediate();
 	assert.equal(calls, 3, 'with nothing in flight a reload reads at once');
+});
+
+test('an outdated read is read again at once only while displayed', async () => {
+	clearTaskCache();
+	let calls = 0;
+	const shown = cached('task:o/r/7', async () => ++calls);
+	const hidden = cached('target:o/r', async () => ++calls);
+	await setImmediate();
+	const unwatch = shown.watch();
+	outdate((key) => key.startsWith('t'));
+	await setImmediate();
+	assert.equal(calls, 3, 'only the displayed one');
+	assert.equal(shown.value, 3);
+	assert.equal(cached('target:o/r', async () => ++calls), hidden);
+	await setImmediate();
+	assert.equal(hidden.value, 4, 'the other when next used');
+	unwatch();
+	outdate(() => true);
+	await setImmediate();
+	assert.equal(calls, 4);
+});
+
+test('a change during a displayed read in flight triggers exactly one more read', async () => {
+	clearTaskCache();
+	let calls = 0;
+	let complete;
+	const resource = cached('overview', () => { calls += 1; return new Promise((resolve) => { complete = resolve; }); });
+	resource.watch();
+	await setImmediate();
+	outdate(() => true);
+	outdate(() => true);
+	complete('before the change');
+	await setImmediate();
+	await setImmediate();
+	assert.equal(calls, 2);
+	complete('after the change');
+	await setImmediate();
+	assert.equal(resource.value, 'after the change');
+	assert.equal(calls, 2);
+});
+
+test('a change before the first response, with nothing watching yet, is followed by one more read', async () => {
+	clearTaskCache();
+	let calls = 0;
+	const completions = [];
+	const resource = cached('overview', () => { calls += 1; return new Promise((resolve, reject) => completions.push({ resolve, reject })); });
+	await setImmediate();
+	outdate(() => true);
+	completions[0].resolve('before the change');
+	await setImmediate();
+	await setImmediate();
+	assert.equal(calls, 2, 'the first answer may predate the change');
+	completions[1].reject(new Error('unavailable'));
+	await setImmediate();
+	// The page shows its error state and keeps watching.
+	resource.watch();
+	outdate(() => true);
+	await setImmediate();
+	completions[2].resolve('after the change');
+	await setImmediate();
+	assert.deepEqual([calls, resource.value, resource.error], [3, 'after the change', undefined]);
 });

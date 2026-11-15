@@ -37,6 +37,8 @@
 	/** The step whose details are shown, from `?phase=`; defaults to where the task is. */
 	const picked = $derived(steps.findIndex((s) => s.key === page.url.searchParams.get('phase')));
 	const summary = $derived(data.resource.value?.task);
+	// Displayed while loading and after a failure too, so no live change is missed.
+	$effect(() => data.resource.watch());
 	const phase = $derived(picked >= 0 ? picked : Math.max(stepIndex(summary?.atStage ?? 'intake'), 0));
 	const phaseData = $derived(summary && phase !== 3 ? api.taskSection(summary, steps[phase].key as TaskSection) : undefined);
 	const timelineData = $derived(summary ? api.taskSection(summary, 'timeline') : undefined);

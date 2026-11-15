@@ -34,6 +34,9 @@
 	});
 	const view = $derived(data.resource.value ?? known);
 	const runsData = $derived(tab === 'runs' ? api.targetRuns(params.owner, params.repo) : undefined);
+	// Displayed while loading and after a failure too, so no live change is missed.
+	$effect(() => data.resource.watch());
+	$effect(() => runsData?.watch());
 	let group = $state('all');
 
 	const groups: Record<string, { label: string; stages?: Stage[] }> = {
