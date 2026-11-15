@@ -9,6 +9,7 @@
 	import Inline from '#lib/components/Inline.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import ReviewList from '#lib/components/ReviewList.svelte';
 	import SavedData from '#lib/components/SavedData.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import { relTime, targetHref, taskHref } from '#lib/format.ts';
@@ -72,7 +73,7 @@
 	</div>
 	<Panel title="Targets"><Skeleton height={120} /></Panel>
 {:else}
-	{@const { tasks, targets, activity, issues } = view}
+	{@const { tasks, targets, activity, issues, reviews } = view}
 	{@const needs = needsYou(tasks)}
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<SavedData resource={data.resource} label="list" />
@@ -160,6 +161,7 @@
 		</div>
 	</section>
 
+	<ReviewList {reviews} />
 	<IssueIntents {issues} />
 	<p class="sponsor-note muted"><Avatar login={session.me.login} size={16} /> Signed in as {session.me.login}. “Needs you” lists tasks you can approve, answer or sponsor.</p>
 {/if}

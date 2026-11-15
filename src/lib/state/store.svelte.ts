@@ -1,7 +1,8 @@
 import { credentials } from '#lib/mock/account.ts';
 import { ME, MOCK_ACTOR_ID, targets } from '#lib/mock/reference.ts';
+import { reviews } from '#lib/mock/reviews.ts';
 import { tasks } from '#lib/mock/tasks.ts';
-import type { Command, CredentialCandidate, CredentialRouteId, IssueIntent, IssueRef, Provider, Stage, Task } from '#lib/types.ts';
+import type { Command, CredentialCandidate, CredentialRouteId, IssueIntent, IssueRef, Provider, ReviewCommand, Sponsorship, Stage, Task } from '#lib/types.ts';
 
 /** In-browser mock state. Mutations stay local; nothing leaves the page. */
 for (const task of tasks) {
@@ -36,7 +37,7 @@ for (const task of tasks) {
         task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Validated replacement credentials can schedule recovery after current consent, required coverage, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
     }
 }
-export const store = $state({ tasks, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
+export const store = $state({ tasks, reviews, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
 
 let seq = 0;
 const now = () => new Date().toISOString();
@@ -52,10 +53,11 @@ function move(task: Task, stage: Stage, title: string, body: string, tone: Task[
 	task.alert = { tone, title, body };
 }
 
-/** Applies a writer command to local mock state and returns the toast text. */
-export function runCommand(issue: IssueRef, command: Command, arg = ''): string {
-    const item = [...store.tasks, ...store.issues].find((t) => t.owner === issue.owner && t.repo === issue.repo && t.issue === issue.issue);
-    if (!item) throw new Error('Issue is not visible.');
+type SponsorshipCommand = Extract<Command, 'funding' | 'sponsor' | 'withdraw'>;
+const isSponsorship = (command: Command): command is SponsorshipCommand => ['funding', 'sponsor', 'withdraw'].includes(command);
+
+/** Applies a provider funding or consent command to an item's projection and returns the toast text. */
+function sponsorshipCommand(item: { sponsorships?: Sponsorship }, command: SponsorshipCommand, arg: string): string {
     if (command === 'funding') {
         const [provider, funding] = arg.split(' ');
         if (!['openai', 'anthropic'].includes(provider) || !['org', 'personal'].includes(funding)) throw new Error('Unknown provider funding selection.');
@@ -72,17 +74,37 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
         }
         return `Selected ${funding === 'personal' ? 'your personal' : 'organization'} credentials for future ${provider} calls.`;
     }
-    if (command === 'sponsor' || command === 'withdraw') {
-        if (!['openai', 'anthropic'].includes(arg)) return 'Usage: /concurro sponsor openai | anthropic';
-        const provider = arg as Provider;
-        item.sponsorships ??= { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: {} };
-        item.sponsorships.facts ??= [];
-        item.sponsorships.facts.push({ actor_id: String(MOCK_ACTOR_ID), provider, command });
-        const old = item.sponsorships.slots[provider];
-        if (command === 'sponsor') item.sponsorships.slots[provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
-        else if (old?.sponsor_id === String(MOCK_ACTOR_ID)) item.sponsorships.slots[provider] = { sponsor_id: null, status: 'withdrawn', epoch: (old.epoch ?? 0) + 1 };
-        return `Posted /concurro ${command} ${provider} for @${ME}. The provider funding selection is unchanged.`;
+    if (!['openai', 'anthropic'].includes(arg)) return 'Usage: /concurro sponsor openai | anthropic';
+    const provider = arg as Provider;
+    item.sponsorships ??= { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: {} };
+    item.sponsorships.facts ??= [];
+    item.sponsorships.facts.push({ actor_id: String(MOCK_ACTOR_ID), provider, command });
+    const old = item.sponsorships.slots[provider];
+    if (command === 'sponsor') item.sponsorships.slots[provider] = { sponsor_id: String(MOCK_ACTOR_ID), login: ME, status: 'active', epoch: (old?.epoch ?? 0) + 1 };
+    else if (old?.sponsor_id === String(MOCK_ACTOR_ID)) item.sponsorships.slots[provider] = { sponsor_id: null, status: 'withdrawn', epoch: (old.epoch ?? 0) + 1 };
+    return `Posted /concurro ${command} ${provider} for @${ME}. The provider funding selection is unchanged.`;
+}
+
+/** Applies a command to a mock standalone review, addressed by its pull request number, and returns the toast text. */
+export function runReviewCommand(ref: IssueRef, command: ReviewCommand, arg = ''): string {
+    const task = store.reviews.find((t) => t.owner === ref.owner && t.repo === ref.repo && t.pr === ref.issue);
+    if (!task) throw new Error('Pull request review is not visible.');
+    if (isSponsorship(command)) return sponsorshipCommand(task, command, arg);
+    const name = `${task.repo}#${task.pr}`;
+    task.updatedAt = now();
+    if (command === 'stop') {
+        Object.assign(task, { stage: 'stopped', active: false, alert: { tone: 'warning', title: `Stopped by ${ME}`, body: 'Run `/concurro resume` to continue this round from where it stopped.' } });
+        return `Stopped ${name}`;
     }
+    Object.assign(task, { stage: 'review', active: true, alert: { tone: 'note', title: command === 'retry' ? 'Retry is queued' : 'Resumed', body: `Round ${task.round} continues on its reviewed snapshot.` } });
+    return command === 'retry' ? `Retry queued for ${name}` : `Resumed ${name}`;
+}
+
+/** Applies a writer command to local mock state and returns the toast text. */
+export function runCommand(issue: IssueRef, command: Command, arg = ''): string {
+    const item = [...store.tasks, ...store.issues].find((t) => t.owner === issue.owner && t.repo === issue.repo && t.issue === issue.issue);
+    if (!item) throw new Error('Issue is not visible.');
+    if (isSponsorship(command)) return sponsorshipCommand(item, command, arg);
     const task = store.tasks.find((t) => t === item);
     if (!task) throw new Error('This demo issue is not enrolled.');
 	const ref = `${task.repo}#${task.issue}`;
@@ -116,7 +138,6 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
 			Object.assign(task, { plans: [], designReview: [], rounds: [], findings: [], approvedPlanId: undefined, paused: undefined });
 			move(task, 'intake', 'Invalidated: assessment restarts', 'Plans, design approvals and review state were discarded. Spent budgets are kept.', 'warning');
 			return `Invalidated ${ref}`;
-
 	}
 }
 

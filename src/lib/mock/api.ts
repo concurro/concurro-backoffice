@@ -1,8 +1,9 @@
 import { store } from '#lib/state/store.svelte.ts';
-import type { Target, Task } from '#lib/types.ts';
+import type { ReviewTask, Target, Task } from '#lib/types.ts';
 import { activity, runsFor, usage } from './account';
 import { operator } from './operator';
 import { MOCK_ACTOR_ID, targets } from './reference';
+import { reportsFor, reviewSummary } from './reviews';
 import { turnsFor } from './turns';
 
 /** Mimics network latency so skeletons are visible. */
@@ -32,13 +33,20 @@ const findTask = (owner: string, repo: string, issue: number): Task => {
 	return t;
 };
 
+const findReview = (owner: string, repo: string, pr: number): ReviewTask => {
+	const t = store.reviews.find((x) => x.owner === owner && x.repo === repo && x.pr === pr);
+	if (!t) throw new NotFound(`${owner}/${repo}#${pr} has no pull request review in Concurro.`);
+	return t;
+};
+
 export const api = {
-	overview: () => delay(() => ({ tasks: store.tasks, issues: store.issues, targets, activity })),
+	overview: () => delay(() => ({ tasks: store.tasks, issues: store.issues, reviews: store.reviews.map(reviewSummary), targets, activity })),
 	target: (owner: string, repo: string) =>
 		delay(() => {
 			const target = findTarget(owner, repo);
 			const tasks = store.tasks.filter((t) => t.owner === owner && t.repo === repo);
-			return { target, tasks, issues: store.issues.filter((i) => i.owner === owner && i.repo === repo) };
+			const reviews = store.reviews.filter((t) => t.owner === owner && t.repo === repo).map(reviewSummary);
+			return { target, tasks, reviews, issues: store.issues.filter((i) => i.owner === owner && i.repo === repo) };
 		}),
 	targetRuns: (owner: string, repo: string) =>
 		delay(() => {
@@ -47,6 +55,17 @@ export const api = {
 		}),
 	task: (owner: string, repo: string, issue: number) =>
 		delay(() => ({ task: findTask(owner, repo, issue), target: findTarget(owner, repo), issueWriter: true })),
+	review: (owner: string, repo: string, pr: number) =>
+		delay(() => ({ task: findReview(owner, repo, pr), target: findTarget(owner, repo), issueWriter: true })),
+	/** A report the review lists without stored content stands for missing or changed evidence. */
+	report: (owner: string, repo: string, pr: number, id: string) =>
+		delay(() => {
+			const task = findReview(owner, repo, pr);
+			if (!task.reports.some((r) => r.id === id)) throw new NotFound(`${owner}/${repo}#${pr} has no report ${id}.`);
+			const report = reportsFor(task).find((r) => r.id === id);
+			if (!report) throw new Error(`The stored evidence for report ${id} no longer matches its recorded digest.`);
+			return { report };
+		}),
     issue: (owner: string, repo: string, issue: number) => delay(() => {
         const item = [...store.tasks, ...store.issues].find((t) => t.owner === owner && t.repo === repo && t.issue === issue);
         if (!item) throw new NotFound('Issue is not visible.');

@@ -1,6 +1,6 @@
 import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Overview, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import type { Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Overview, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
@@ -88,6 +88,18 @@ export const api = {
 			return result;
 		});
 	},
+	/** A standalone pull request review; follows the same task changes as an issue task. */
+	review(owner: string, repo: string, pr: number) {
+		return cached(`review:${path(owner, repo, pr)}`, async () => {
+			const result = await request<ReviewView>('GET', `/api/reviews/${path(owner, repo, pr)}`);
+			remember({ profiles: result.target.profiles });
+			return result;
+		});
+	},
+	/** A reviewer's complete report; a failed read means its stored evidence is missing or changed. */
+	report: (owner: string, repo: string, number: number, id: string) =>
+		cached(`report:${path(owner, repo, number)}/${encodeURIComponent(id)}`, () =>
+			request<{ report: Report }>('GET', `/api/tasks/${path(owner, repo, number)}/reports/${encodeURIComponent(id)}`)),
 	/** Fetch only the selected phase, timeline or live PR data. */
 	taskSection(task: Task, section: TaskSection) {
 		const key = path(task.owner, task.repo, task.issue);
@@ -123,6 +135,12 @@ export const actions = {
 	async command(task: IssueRef, command: Command, arg = ''): Promise<string> {
 		const argument = (['approve', 'retry', 'sponsor', 'withdraw', 'funding'].includes(command)) && arg ? arg : undefined;
 		const result = await request<{ posted: string; actor: string }>('POST', `/api/repos/${path(task.owner, task.repo)}/issues/${task.issue}/commands`, { command, argument });
+		clearTaskCache();
+		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
+	},
+	/** Sends a command for a standalone review, addressed by its pull request number. Returns toast text. */
+	async reviewCommand(task: IssueRef, command: ReviewCommand, arg = ''): Promise<string> {
+		const result = await request<{ posted: string; actor: string }>('POST', `/api/tasks/${path(task.owner, task.repo, task.issue)}/commands`, { command, argument: arg || undefined });
 		clearTaskCache();
 		return `Concurro posted ${result.posted} for @${result.actor} on ${task.repo}#${task.issue}`;
 	},

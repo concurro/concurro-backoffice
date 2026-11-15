@@ -19,7 +19,8 @@ export function concerns(change: LiveChange): (key: string) => boolean {
 	if (change.kind !== 'runs') {
 		keys.add('overview');
 		if (change.kind === 'tasks') {
-			if (change.repository && change.issue !== null) keys.add(`task:${slug(change.repository)}/${change.issue}`);
+			if (change.repository && change.issue !== null)
+				for (const kind of ['task', 'review']) keys.add(`${kind}:${slug(change.repository)}/${change.issue}`);
 		} else for (const target of change.targets) keys.add(`target:${slug(target)}`);
 	}
 	return (key) => keys.has(key);

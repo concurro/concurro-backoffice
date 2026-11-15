@@ -37,6 +37,7 @@ import type {
 	CredentialStatus,
 	FindingStatus,
 	Role,
+	Severity,
 	Stage,
 	Target,
 	Task,
@@ -112,6 +113,32 @@ export const findingMeta: Record<FindingStatus, Meta> = {
 	obsolete: m('Obsolete', 'neutral', CircleSlash),
 	withdrawn: m('Withdrawn', 'info', Undo2)
 };
+
+export const severityTone: Record<Severity, Tone> = { critical: 'danger', high: 'warning', medium: 'info', low: 'neutral' };
+
+/** Stages only a standalone pull request review has; the rest are shared with issue tasks. */
+const reviewStages: Record<string, Meta> = {
+	queued: m('Queued', 'neutral', Clock),
+	review: m('Reviewing', 'info', ScanSearch),
+	publishing: m('Publishing reviews', 'info', Upload),
+	complete: m('Complete', 'success', CircleCheck)
+};
+const roundOutcomes: Record<string, Meta> = {
+	active: m('Active', 'info', Loader),
+	complete: m('Complete', 'success', Check),
+	cancelled: m('Cancelled', 'neutral', Ban),
+	closed: m('Closed', 'neutral', CircleSlash)
+};
+/** A status the app has no entry for is shown as the engine names it. */
+const unlisted = (name: string, empty: string) => m(name || empty, 'neutral', CircleDashed);
+
+export const reviewStageMeta = (stage: string): Meta => reviewStages[stage] ?? stageMeta[stage as Stage] ?? unlisted(stage, 'Unknown');
+export const roundOutcomeMeta = (outcome: string): Meta => roundOutcomes[outcome] ?? unlisted(outcome, 'Not started');
+export const findingStatusMeta = (status: string): Meta => findingMeta[status as FindingStatus] ?? unlisted(status, 'Unknown');
+/** Whether a pull request is open, a draft, closed or merged. */
+export const pullStateMeta = (pull: { open: boolean; draft: boolean; merged?: boolean }): Meta =>
+	pull.merged ? m('Merged', 'accent', GitMerge) : !pull.open ? m('Closed', 'neutral', CircleSlash) : pull.draft ? m('Draft', 'neutral', PencilLine) : m('Open', 'success', GitPullRequest);
+export const reviewVerdictMeta = (verdict: string): Meta => verdictMeta[verdict as Verdict] ?? unlisted(verdict, 'Unknown');
 
 export const credentialMeta: Record<CredentialStatus, Meta> = {
 	invalid: { label: 'Invalid', tone: 'danger', icon: CircleX },

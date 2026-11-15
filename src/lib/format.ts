@@ -33,6 +33,15 @@ export const bytes = (s: string) => new TextEncoder().encode(s).length;
 /** Links under the base path. */
 export const taskHref = (t: { owner: string; repo: string; issue: number }) => withBase(`/tasks/${t.owner}/${t.repo}/${t.issue}`);
 export const targetHref = (t: { owner: string; repo: string }) => withBase(`/targets/${t.owner}/${t.repo}`);
+export const reviewHref = (t: { owner: string; repo: string; pr: number }) => withBase(`/reviews/${t.owner}/${t.repo}/${t.pr}`);
+/** A reviewer's full report, under its review page. */
+export const reportHref = (t: { owner: string; repo: string; pr: number }, report: string) => `${reviewHref(t)}/reports/${encodeURIComponent(report)}`;
+
+/** The reviewed pull request on GitHub. */
+export const pullUrl = (t: { owner: string; repo: string; pr: number }) => `https://github.com/${t.owner}/${t.repo}/pull/${t.pr}`;
+
+/** A commit SHA abbreviated for display. */
+export const shortSha = (sha: string) => sha.slice(0, 7);
 
 /** The issue on GitHub, where a writer gives commands themselves. */
 export const issueUrl = (t: { owner: string; repo: string; issue: number }) => `https://github.com/${t.owner}/${t.repo}/issues/${t.issue}`;

@@ -25,6 +25,8 @@ export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'acce
 export type AlertTone = 'note' | 'tip' | 'warning' | 'caution';
 export type CiStatus = 'passing' | 'failing' | 'pending' | 'none' | 'unknown';
 export type Command = 'funding' | 'start' | 'approve' | 'retry' | 'resume' | 'stop' | 'invalidate' | 'sponsor' | 'withdraw';
+/** Commands a standalone pull request review accepts. */
+export type ReviewCommand = Extract<Command, 'stop' | 'retry' | 'resume' | 'funding' | 'sponsor' | 'withdraw'>;
 
 export interface ModelProfile {
 	name: string;
@@ -496,8 +498,130 @@ export interface ActionsRun {
 	durationS: number;
 }
 
+/** A reviewed upstream pull request in a list. */
+export interface ReviewSummary {
+	owner: string;
+	repo: string;
+	pr: number;
+	title: string;
+	open: boolean;
+	draft: boolean;
+	branch: string;
+	/** Abbreviated to 7 characters. */
+	headSha: string;
+	ci: Exclude<CiStatus, 'unknown'>;
+	updatedAt: string;
+}
+
+/** The pull request as frozen for a review round; SHAs are full. */
+export interface ReviewSnapshot {
+	head: string;
+	/** Merge base of `head` and the base branch. */
+	base: string;
+	baseRef: string;
+	baseTip: string;
+	title: string;
+}
+
+/** The pull request as GitHub last reported it, which a finished round never covers. */
+export interface ReviewObserved {
+	head: string;
+	baseRef: string;
+	baseTip: string;
+	title: string;
+	draft: boolean;
+	open: boolean;
+	merged: boolean;
+}
+
+/** One reviewer request: a point-in-time assessment of one snapshot. */
+export interface ReviewRequestRound {
+	round: number;
+	head: string;
+	base: string;
+	baseRef: string;
+	baseTip: string;
+	requestedBy: string;
+	requestedAt: string;
+	opened: string;
+	started: string;
+	completed: string;
+	/** `active`, `complete`, `cancelled`, `closed`, or empty. */
+	outcome: string;
+	cancelled: boolean;
+	/** `verdict` is `approve`, `changes_requested`, or `pending` until the reviewer finishes. */
+	reviewers: { reviewer: string; verdict: string; reportId: string | null; model: string }[];
+}
+
+export interface ReportSummary {
+	id: string;
+	step: string;
+	reviewer: string;
+	model: string;
+	round: number | null;
+	head: string;
+	outcome: string;
+	at: string;
+}
+
+/** `GET /api/tasks/{owner}/{repo}/{number}/reports/{id}`; every `content` string is untrusted model text. */
+export interface Report extends ReportSummary {
+	kind: string;
+	title: string;
+	details: Record<string, unknown>;
+	digest: string;
+	artifacts: number[];
+	content: {
+		verdict: 'approve' | 'changes_requested';
+		headline?: string;
+		summary: string;
+		findings: { severity?: string; title?: string; path: string | null; start_line: number | null; line: number | null; detail: string }[];
+		dispositions: { id: string; status: string; evidence: string }[];
+		/** IDs of `findings`, in the same order. */
+		finding_ids?: string[];
+		[key: string]: unknown;
+	};
+}
+
+/** A standalone review of an existing upstream pull request. */
+export interface ReviewTask {
+	kind: 'standalone_pr_review';
+	owner: string;
+	repo: string;
+	pr: number;
+	title: string;
+	author: string;
+	/** `queued`, `review`, `publishing`, `complete`, `closed`, or a pause stage. */
+	stage: string;
+	active: boolean;
+	alert: TaskAlert;
+	round: number;
+	snapshot: ReviewSnapshot;
+	observed: ReviewObserved;
+	/** The pull request moved after the snapshot; the review does not cover the change. */
+	changedSinceReview: boolean;
+	rounds: ReviewRequestRound[];
+	findings: Finding[];
+	reports: ReportSummary[];
+	budgets: { modelCalls: Budget };
+	/** Mirror of the GitHub Check Run. */
+	check: { round: number | null; attempt: number | null; published: boolean; pending: boolean; completed: boolean };
+	enrolledAt: string;
+	updatedAt: string;
+	sponsorships?: Sponsorship;
+	revision: string;
+}
+
+/** `GET /api/reviews/{owner}/{repo}/{pr}`. */
+export interface ReviewView {
+	task: ReviewTask;
+	issueWriter: boolean;
+	target: Target;
+}
+
 /** `GET /api/overview`. */
 export interface Overview {
+	reviews: ReviewSummary[];
 	tasks: Task[];
 	issues: IssueIntent[];
 	targets: Target[];
@@ -507,6 +631,7 @@ export interface Overview {
 
 /** `GET /api/targets/{owner}/{repo}`. */
 export interface TargetView {
+	reviews: ReviewSummary[];
 	issues: IssueIntent[];
 	target: Target;
 	tasks: Task[];

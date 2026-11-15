@@ -19,11 +19,11 @@ const { concerns } = await import(new URL('changes.mjs', directory).href);
 const { follow } = await import(new URL('events.mjs', directory).href);
 
 const change = (kind, fields = {}) => ({ kind, repository: 'up/project', issue: null, targets: ['up/project'], ...fields });
-const KEYS = ['overview', 'target:up/project', 'target:up/other', 'runs:up/project', 'task:up/project/7', 'task:up/project/8', 'section:up/project/7:plan'];
+const KEYS = ['overview', 'target:up/project', 'target:up/other', 'runs:up/project', 'task:up/project/7', 'task:up/project/8', 'review:up/project/7', 'review:up/project/8', 'section:up/project/7:plan'];
 const concerned = (event) => KEYS.filter(concerns(event));
 
 test('a change outdates the reads that show it', () => {
-	assert.deepEqual(concerned(change('tasks', { issue: 7 })), ['overview', 'task:up/project/7']);
+	assert.deepEqual(concerned(change('tasks', { issue: 7 })), ['overview', 'task:up/project/7', 'review:up/project/7']);
 	assert.deepEqual(concerned(change('issues', { issue: 7 })), ['overview', 'target:up/project']);
 	assert.deepEqual(concerned(change('pulls')), ['overview', 'target:up/project']);
 	assert.deepEqual(concerned(change('sponsorships', { targets: ['up/project', 'up/other'] })), ['overview', 'target:up/project', 'target:up/other']);

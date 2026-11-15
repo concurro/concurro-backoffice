@@ -1,8 +1,8 @@
 import { cached, clearTaskCache } from './cache.svelte.ts';
-import { api as fixtures } from '#lib/mock/api.ts';
+import { api as fixtures, NotFound } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
-import { revokeCredential, runCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Overview, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
+import { revokeCredential, runCommand, runReviewCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
+import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Overview, Report, ReviewCommand, ReviewView, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
 import { apply } from './events.ts';
 import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
@@ -47,6 +47,13 @@ export const api = {
 			return { task: view.task };
 		}, task.updatedAt);
 	},
+	review: (owner: string, repo: string, pr: number) => cached<ReviewView>(`review:${owner}/${repo}/${pr}`, () => fixtures.review(owner, repo, pr)),
+	/** Fail as the API does: 404 for an unknown report, a conflict when its evidence is unavailable. */
+	report: (owner: string, repo: string, number: number, id: string) =>
+		cached<{ report: Report }>(`report:${owner}/${repo}/${number}/${id}`, () =>
+			fixtures.report(owner, repo, number, id).catch((error: Error) => {
+				throw new ApiError(error instanceof NotFound ? 404 : 409, error.message);
+			})),
 	turns: fixtures.turns,
 	/** Project the fixture's runner into the same shape as live Actions evidence. */
 	async turnRuns(owner: string, repo: string, issue: number, identifier: string): Promise<TurnRuns> {
@@ -74,6 +81,12 @@ export const actions = {
     /** Apply issue commands before invalidating independently loaded fixture views. */
     async command(task: IssueRef, command: Command, arg = '') {
         const message = runCommand(task, command, arg);
+        clearTaskCache();
+        apply({ kind: 'tasks', repository: `${task.owner}/${task.repo}`, issue: task.issue, targets: [] });
+        return message;
+    },
+    async reviewCommand(task: IssueRef, command: ReviewCommand, arg = '') {
+        const message = runReviewCommand(task, command, arg);
         clearTaskCache();
         apply({ kind: 'tasks', repository: `${task.owner}/${task.repo}`, issue: task.issue, targets: [] });
         return message;

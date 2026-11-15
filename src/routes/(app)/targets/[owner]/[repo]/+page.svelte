@@ -12,6 +12,7 @@
 	import Inline from '#lib/components/Inline.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import ReviewList from '#lib/components/ReviewList.svelte';
 	import SavedData from '#lib/components/SavedData.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import Tabs from '#lib/components/Tabs.svelte';
@@ -21,7 +22,7 @@
 	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
 	import { actions as writes, api, profile, session } from '#lib/api/index.ts';
 	import { toast } from '#lib/state/toast.svelte.ts';
-	import type { ActionsRun, Stage, Task, Tone } from '#lib/types.ts';
+	import type { ActionsRun, ReviewSummary, Stage, Task, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
@@ -30,7 +31,7 @@
 	const known = $derived.by(() => {
 		const name = `${params.owner}/${params.repo}`;
 		const target = session.targets.find((t) => [`${t.owner}/${t.repo}`, t.fork, ...issueRepositories(t)].includes(name));
-		return target && { target, tasks: session.tasks.filter(inTarget(target)), issues: session.issues.filter(inTarget(target)) };
+		return target && { target, tasks: session.tasks.filter(inTarget(target)), issues: session.issues.filter(inTarget(target)), reviews: [] as ReviewSummary[] };
 	});
 	const view = $derived(data.resource.value ?? known);
 	const runsData = $derived(tab === 'runs' ? api.targetRuns(params.owner, params.repo) : undefined);
@@ -70,7 +71,7 @@
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
 {:else}
-	{@const { target, tasks, issues } = view}
+	{@const { target, tasks, issues, reviews } = view}
 	{@const prs = tasks.filter((t) => t.pr)}
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<SavedData resource={data.resource} label="list" />
@@ -106,7 +107,7 @@
 		bind:value={tab}
 		tabs={[
 			{ value: 'issues', label: 'Issues', count: tasks.length },
-			{ value: 'pulls', label: 'Pull requests', count: prs.length },
+			{ value: 'pulls', label: 'Pull requests', count: prs.length + reviews.length },
 			{ value: 'runs', label: 'Actions runs' },
 			{ value: 'config', label: 'Configuration' }
 		]}
@@ -144,6 +145,7 @@
 				{/if}
 			</Panel>
 		{:else if tab === 'pulls'}
+			<ReviewList {reviews} />
 			<Panel flush title="Pull requests from Concurro" meta={String(prs.length)}>
 				{#if prs.length}
 					<DataTable label="Pull requests">

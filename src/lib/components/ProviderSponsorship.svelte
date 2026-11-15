@@ -8,7 +8,15 @@
 	import Button from './Button.svelte';
 	import Panel from './Panel.svelte';
 
-	let { issue, projection, writer = false, refresh = invalidateAll }: { issue: IssueRef; projection?: Sponsorship; writer?: boolean; refresh?: () => unknown } = $props();
+	interface Props {
+		issue: IssueRef;
+		projection?: Sponsorship;
+		writer?: boolean;
+		refresh?: () => unknown;
+		/** How the funding commands are sent; a standalone review has its own command route. */
+		post?: (issue: IssueRef, command: 'sponsor' | 'withdraw' | 'funding', arg: string) => Promise<string>;
+	}
+	let { issue, projection, writer = false, refresh = invalidateAll, post = actions.command }: Props = $props();
 	let busy = $state(false);
 	const providers: Provider[] = ['openai', 'anthropic'];
     const recovery = $derived(projection?.recovery);
@@ -19,7 +27,7 @@
 		if (busy) return;
 		busy = true;
 		try {
-			toast(await actions.command(issue, command, funding ? `${provider} ${funding}` : provider));
+			toast(await post(issue, command, funding ? `${provider} ${funding}` : provider));
 			await invalidateAll();
 		} catch (error) {
 			toast(error instanceof Error ? error.message : 'The command could not be posted.', 'danger');
