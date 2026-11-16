@@ -8,10 +8,10 @@
     let { data }: PageProps = $props();
 </script>
 <svelte:head><title>Issue sponsorship · Concurro</title></svelte:head>
-{#await data.result}<Skeleton rows={6} />{:then { issue, issueWriter }}
+{#await data.result}<Skeleton rows={6} />{:then { issue, target, issueWriter }}
     <PageHeader title={issue.title} subtitle={`${issue.owner}/${issue.repo}#${issue.issue} · Issue consent is recorded independently of task enrollment.`} />
     <div class="stack">
-        <ProviderSponsorship {issue} projection={issue.sponsorships} writer={issueWriter} />
+        <ProviderSponsorship {issue} {target} projection={issue.sponsorships} writer={issueWriter} />
         {#if issue.sponsorships && issue.sponsorships.scope !== 'own'}<FundingAudit projection={issue.sponsorships} />{/if}
     </div>
 {:catch error}<ErrorState {error} />{/await}

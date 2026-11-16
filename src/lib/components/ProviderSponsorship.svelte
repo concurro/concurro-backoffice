@@ -6,22 +6,24 @@
 	import { PROVIDERS, providerFunding, providerName, type Payer } from '#lib/funding.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { toast } from '#lib/state/toast.svelte.ts';
-	import type { CredentialListing, IssueRef, Provider, Sponsorship } from '#lib/types.ts';
+	import type { CredentialListing, IssueRef, Provider, Sponsorship, Target } from '#lib/types.ts';
 	import Panel from './Panel.svelte';
 
 	interface Props {
 		issue: IssueRef;
 		projection?: Sponsorship;
 		writer?: boolean;
+		/** The configured target, whose `owner/repo` credential profile filters name; filters go unchecked without it. */
+		target?: Pick<Target, 'owner' | 'repo'>;
 		refresh?: () => unknown;
 		/** How the funding commands are sent; a standalone review has its own command route. */
 		post?: (issue: IssueRef, command: 'sponsor' | 'withdraw' | 'funding', arg: string) => Promise<string>;
 	}
-	let { issue, projection, writer = false, refresh = invalidateAll, post = actions.command }: Props = $props();
+	let { issue, projection, writer = false, target, refresh = invalidateAll, post = actions.command }: Props = $props();
 	let busy = $state(false);
 	let listing = $state<CredentialListing>();
 	const me = $derived(session.me.id ? String(session.me.id) : '');
-	const rows = $derived(PROVIDERS.map((provider) => providerFunding(projection, provider, me, listing, `${issue.owner}/${issue.repo}`)));
+	const rows = $derived(PROVIDERS.map((provider) => providerFunding(projection, provider, me, listing, target ? `${target.owner}/${target.repo}` : '')));
 	const alert = $derived(rows.find((row) => row.alert && row.alert.kind !== 'warning')?.alert);
 
 	const POLICY =
@@ -65,7 +67,7 @@
 	}
 
 	function tip(row: ReturnType<typeof providerFunding>, segment: Payer, text: string) {
-		return row.pending && row.intended === segment ? `Pending: ${text}` : text;
+		return row.intended === segment || (segment === 'none' && row.withdrawing) ? `Pending: ${text}` : text;
 	}
 </script>
 
@@ -105,7 +107,7 @@
 						<span class="state" class:on={row.payer === 'org'} class:pending={row.intended === 'org'} role="img" title={tip(row, 'org', row.payer === 'org' ? 'The organization pays' : 'Organization credentials')} aria-label={row.payer === 'org' ? 'The organization pays' : 'Organization credentials'}><Building2 size={15} aria-hidden="true" /></span>
 					{/if}
 					{#if row.mine}
-						<button class:on={row.payer === 'none'} class:pending={row.intended === 'none'} disabled={busy} onclick={() => command('withdraw', row.provider)} title={tip(row, 'none', `Withdraw your consent${row.payer === 'me' ? '; calls pause until someone else pays' : ''}`)} aria-label="Withdraw your {name} consent"><X size={15} aria-hidden="true" /></button>
+						<button class:on={row.payer === 'none'} class:pending={row.withdrawing || row.intended === 'none'} disabled={busy} onclick={() => command('withdraw', row.provider)} title={tip(row, 'none', `Withdraw your consent${row.payer === 'me' ? '; calls pause until someone else pays' : ''}`)} aria-label="Withdraw your {name} consent"><X size={15} aria-hidden="true" /></button>
 					{:else if row.payer === 'none' || row.intended === 'none'}
 						<span class="state" class:on={row.payer === 'none'} class:pending={row.intended === 'none'} role="img" title={tip(row, 'none', 'No one pays; calls pause')} aria-label="No one pays; calls pause"><X size={15} aria-hidden="true" /></span>
 					{/if}

@@ -18,6 +18,8 @@ export interface ProviderFunding {
 	/** A choice not yet confirmed or adopted, and what it would change to. */
 	pending: boolean;
 	intended?: Payer;
+	/** Removal of the current sponsor's consent awaits confirmation, whoever pays. */
+	withdrawing: boolean;
 	/** Why the viewer's own credentials cannot serve this provider now. */
 	unusable?: string;
 	/** A pause or a sponsor gap this provider causes. */
@@ -38,13 +40,17 @@ function payerOf(funding: string | undefined, sponsor: string | null | undefined
 	return !sponsor ? 'none' : sponsor === me ? 'me' : 'other';
 }
 
-/** Why the viewer's own list cannot serve a provider's calls on target `owner/repo`; absent when it can or the list is unknown. */
+/**
+ * Why the viewer's own list cannot serve a provider's calls on the configured target `owner/repo`;
+ * absent when it can or the list is unknown. Filters are not matched while the target is unknown.
+ */
 function ownGap(listing: CredentialListing | undefined, provider: Provider, target: string, requirements: CredentialRequirement[]): string | undefined {
 	if (!listing) return undefined;
 	const entries = listing.providers.find((list) => list.provider === provider)?.entries ?? [];
 	const usable = entries.filter((entry) => entry.enabled && entry.status === 'valid');
 	if (!entries.length) return `You have no ${providerName(provider)} credential.`;
 	if (!usable.length) return `Your ${providerName(provider)} credentials are all turned off or need a new token.`;
+	if (!target) return undefined;
 	const unmatched = requirements.filter((route) => !usable.some((entry) => admits(entry, route.role, { target, profile: route.profile })));
 	return unmatched.length ? unmatched.map((route) => `${callName(route)}: none of your credentials is set to be used for this`).join('\n') : undefined;
 }
@@ -62,8 +68,11 @@ export function providerFunding(projection: Sponsorship | undefined, provider: P
 	const source = projection?.source_slots?.[provider];
 	const sourceFunding = projection?.source_provider_funding?.[provider];
 	const intended = projection?.scope === 'own' ? undefined : payerOf(sourceFunding ?? funding, source?.sponsor_id !== undefined ? source.sponsor_id : slot?.sponsor_id, me);
+	// A withdrawal names a null sponsor; a pending funding change alone leaves the sponsor out.
+	const withdrawing = !!slot?.sponsor_id && source?.sponsor_id === null;
 	const pending =
 		(intended !== undefined && intended !== payer) ||
+		withdrawing ||
 		!!projection?.pending?.includes(provider) ||
 		(!!projection && projection.scope !== 'own' && (projection.status !== 'confirmed' || projection.task_status === 'pending'));
 
@@ -85,5 +94,5 @@ export function providerFunding(projection: Sponsorship | undefined, provider: P
 		else alert = { kind: 'paused', text: 'Paused · a writer must retry.' };
 	} else if (payer === 'none') alert = { kind: 'warning', text: `No sponsor · ${providerName(provider)} calls will pause.` };
 
-	return { provider, payer, sponsor: slot?.login ?? slot?.sponsor_id ?? undefined, mine, pending, intended: pending ? intended : undefined, unusable, alert };
+	return { provider, payer, sponsor: slot?.login ?? slot?.sponsor_id ?? undefined, mine, pending, intended: intended !== payer ? intended : undefined, withdrawing, unusable, alert };
 }

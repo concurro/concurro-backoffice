@@ -168,6 +168,7 @@
 			<ProviderSponsorship
 				issue={{ owner: task.owner, repo: task.repo, issue: task.pr }}
 				post={writes.reviewCommand}
+				target={data.resource.value?.target}
 				refresh={data.resource.refresh}
 				projection={task.sponsorships}
 				writer={data.resource.value?.issueWriter ?? false}

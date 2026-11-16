@@ -151,7 +151,7 @@
 					<Meter label="Plan revisions" {...task.budgets.planRevisions} />
 				</div>
 			</Panel>
-			<ProviderSponsorship issue={task} refresh={data.resource.refresh} projection={task.sponsorships} writer={data.resource.value?.issueWriter ?? false} />
+			<ProviderSponsorship issue={task} target={data.resource.value?.target} refresh={data.resource.refresh} projection={task.sponsorships} writer={data.resource.value?.issueWriter ?? false} />
 			<Panel title="Timeline" meta={timelineTask ? String(timelineTask.timeline.length) : undefined} id="timeline">
 				{#if timelineData?.error}<ErrorState error={timelineData.error} retry={timelineData.refresh} />{/if}
 				{#if timelineTask}

@@ -40,6 +40,14 @@ test('a pending choice marks its intended payer', () => {
 	const withdrawal = providerFunding(base({ provider_funding: { openai: 'contributed' }, slots: { openai: { sponsor_id: ME } }, source_slots: { openai: { sponsor_id: null } } }), 'openai', ME);
 	assert.equal(withdrawal.payer, 'me');
 	assert.equal(withdrawal.intended, 'none');
+	assert.equal(withdrawal.withdrawing, true);
+	const orgWithdrawal = providerFunding(base({ pending: ['openai'], slots: { openai: { sponsor_id: ME } }, source_slots: { openai: { sponsor_id: null } } }), 'openai', ME);
+	assert.equal(orgWithdrawal.payer, 'org');
+	assert.equal(orgWithdrawal.intended, undefined, 'the unchanged organization payer is not pending');
+	assert.equal(orgWithdrawal.withdrawing, true);
+	assert.equal(orgWithdrawal.pending, true);
+	const fundingOnly = providerFunding(base({ slots: { openai: { sponsor_id: ME } }, source_slots: { openai: { funding: 'org' } } }), 'openai', ME);
+	assert.equal(fundingOnly.withdrawing, false, 'a pending funding change is not a withdrawal');
 });
 
 test('unusable explains the viewer’s own gap', () => {
@@ -53,6 +61,7 @@ test('unusable explains the viewer’s own gap', () => {
 	assert.match(providerFunding(base(routes), 'openai', ME, listing([entry({ roles: ['triage'] })]), target).unusable, /implementer · gpt-5: none of your credentials/);
 	assert.match(providerFunding(base(routes), 'openai', ME, listing([entry({ profiles: [{ target: 'acme/other', profile: 'high' }] })]), target).unusable, /none of your credentials/);
 	assert.equal(providerFunding(base(routes), 'openai', ME, listing([entry({ roles: ['implementer'], profiles: [{ target, profile: 'high' }] })]), target).unusable, undefined);
+	assert.equal(providerFunding(base(routes), 'openai', ME, listing([entry({ profiles: [{ target, profile: 'high' }] })])).unusable, undefined, 'filters go unchecked without the configured target');
 	const sponsored = base({
 		provider_funding: { openai: 'contributed' },
 		slots: { openai: { sponsor_id: ME } },
