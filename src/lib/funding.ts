@@ -1,5 +1,5 @@
-import { recoveryQueued } from '#lib/credentials.ts';
-import type { CredentialListing, Provider, Sponsorship } from '#lib/types.ts';
+import { admits, recoveryQueued } from '#lib/credentials.ts';
+import type { CredentialListing, CredentialRequirement, Provider, Sponsorship } from '#lib/types.ts';
 
 export const PROVIDERS: Provider[] = ['openai', 'anthropic'];
 export const providerName = (provider: Provider) => (provider === 'openai' ? 'OpenAI' : 'Anthropic');
@@ -38,35 +38,40 @@ function payerOf(funding: string | undefined, sponsor: string | null | undefined
 	return !sponsor ? 'none' : sponsor === me ? 'me' : 'other';
 }
 
-/** Why the viewer's own list cannot serve a provider; absent when it can or the list is unknown. */
-function ownGap(listing: CredentialListing | undefined, provider: Provider): string | undefined {
+/** Why the viewer's own list cannot serve a provider's calls on target `owner/repo`; absent when it can or the list is unknown. */
+function ownGap(listing: CredentialListing | undefined, provider: Provider, target: string, requirements: CredentialRequirement[]): string | undefined {
 	if (!listing) return undefined;
 	const entries = listing.providers.find((list) => list.provider === provider)?.entries ?? [];
-	if (entries.some((entry) => entry.enabled && entry.status === 'valid')) return undefined;
-	return entries.length
-		? `Your ${providerName(provider)} credentials are all turned off or need a new token.`
-		: `You have no ${providerName(provider)} credential.`;
+	const usable = entries.filter((entry) => entry.enabled && entry.status === 'valid');
+	if (!entries.length) return `You have no ${providerName(provider)} credential.`;
+	if (!usable.length) return `Your ${providerName(provider)} credentials are all turned off or need a new token.`;
+	const unmatched = requirements.filter((route) => !usable.some((entry) => admits(entry, route.role, { target, profile: route.profile })));
+	return unmatched.length ? unmatched.map((route) => `${callName(route)}: none of your credentials is set to be used for this`).join('\n') : undefined;
 }
 
+const callName = (route: CredentialRequirement) => `${route.role.replaceAll('_', ' ')} · ${route.model}`;
+
 /** One provider's funding as the compact widget shows it to viewer `me`. */
-export function providerFunding(projection: Sponsorship | undefined, provider: Provider, me: string, listing?: CredentialListing): ProviderFunding {
+export function providerFunding(projection: Sponsorship | undefined, provider: Provider, me: string, listing?: CredentialListing, target = ''): ProviderFunding {
 	const slot = projection?.slots?.[provider];
 	const mine = !!me && slot?.sponsor_id === me;
 	const shared = projection?.funding === 'org' || projection?.funding === 'contributed' ? projection.funding : undefined;
 	const funding = projection?.provider_funding?.[provider] ?? shared;
-	const payer = payerOf(funding, slot?.sponsor_id, me) ?? (projection?.scope === 'own' && mine ? 'me' : undefined);
+	// A consent-only view omits funding, so its payer stays unknown even when the viewer holds consent.
+	const payer = projection?.scope === 'own' ? undefined : payerOf(funding, slot?.sponsor_id, me);
 	const source = projection?.source_slots?.[provider];
 	const sourceFunding = projection?.source_provider_funding?.[provider];
-	const intended = payerOf(sourceFunding ?? funding, source?.sponsor_id !== undefined ? source.sponsor_id : slot?.sponsor_id, me);
+	const intended = projection?.scope === 'own' ? undefined : payerOf(sourceFunding ?? funding, source?.sponsor_id !== undefined ? source.sponsor_id : slot?.sponsor_id, me);
 	const pending =
 		(intended !== undefined && intended !== payer) ||
 		!!projection?.pending?.includes(provider) ||
 		(!!projection && projection.scope !== 'own' && (projection.status !== 'confirmed' || projection.task_status === 'pending'));
 
-	const gaps = payer === 'me' ? projection?.coverage?.[provider]?.filter((route) => route.status !== 'available') ?? [] : [];
+	const requirements = projection?.coverage?.[provider] ?? [];
+	const gaps = payer === 'me' ? requirements.filter((route) => route.status !== 'available') : [];
 	const unusable = gaps.length
-		? gaps.map((route) => `${route.role.replaceAll('_', ' ')} · ${route.model}: ${COVERAGE[route.status ?? 'unknown'] ?? route.status}`).join('\n')
-		: ownGap(listing, provider);
+		? gaps.map((route) => `${callName(route)}: ${COVERAGE[route.status ?? 'unknown'] ?? route.status}`).join('\n')
+		: ownGap(listing, provider, target, requirements);
 
 	let alert: ProviderFunding['alert'];
 	const recovery = projection?.recovery;

@@ -8,6 +8,10 @@ export interface ProfileOption extends ProfileFilter {
 
 export const sameProfile = (a: ProfileFilter, b: ProfileFilter) => a.target === b.target && a.profile === b.profile;
 
+/** Whether an entry's filters admit a role's call under a profile on target `owner/repo`. */
+export const admits = (policy: CredentialPolicy, role: string, filter: ProfileFilter) =>
+	(!policy.roles.length || policy.roles.includes(role)) && (!policy.profiles.length || policy.profiles.some((p) => sameProfile(p, filter)));
+
 /** One provider's profiles by target, followed by selected ones no visible target offers any more. */
 export function profileOptions(targets: Target[], provider: Provider, selected: ProfileFilter[]): ProfileOption[] {
 	const known = targets.flatMap((target) => {

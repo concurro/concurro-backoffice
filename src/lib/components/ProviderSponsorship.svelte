@@ -21,7 +21,7 @@
 	let busy = $state(false);
 	let listing = $state<CredentialListing>();
 	const me = $derived(session.me.id ? String(session.me.id) : '');
-	const rows = $derived(PROVIDERS.map((provider) => providerFunding(projection, provider, me, listing)));
+	const rows = $derived(PROVIDERS.map((provider) => providerFunding(projection, provider, me, listing, `${issue.owner}/${issue.repo}`)));
 	const alert = $derived(rows.find((row) => row.alert && row.alert.kind !== 'warning')?.alert);
 
 	const POLICY =
@@ -30,10 +30,23 @@
 		'Changes apply to future calls; attempts already charged keep their payer. ' +
 		'Withdrawing removes only your own consent.';
 
+	let reads = 0;
+	/** Reads the viewer's lists again; a failed or superseded read leaves the person icon neutral. */
+	function loadListing() {
+		const read = ++reads;
+		api.credentialListing().then(
+			(value) => read === reads && (listing = value),
+			() => read === reads && (listing = undefined)
+		);
+	}
+	// Every new projection, from a refresh or a command, rereads the lists with it.
 	$effect(() => {
-		if (!me) return;
-		api.credentialListing().then((value) => (listing = value), () => (listing = undefined));
+		if (me && projection !== null) loadListing();
 	});
+	function reload() {
+		refresh();
+		loadListing();
+	}
 
 	const due = (seconds?: number) => (!seconds || seconds * 1000 <= Date.now() ? 'shortly' : `at ${absTime(new Date(seconds * 1000).toISOString())}`);
 
@@ -59,13 +72,14 @@
 <Panel title="Funding" id="sponsorship">
 	{#snippet actions()}
 		<span class="icon" role="img" aria-label={POLICY} title={POLICY}><Info size={14} aria-hidden="true" /></span>
-		<button class="icon" onclick={refresh} disabled={busy} aria-label="Refresh funding" title="Refresh"><RefreshCw size={14} aria-hidden="true" /></button>
+		<button class="icon" onclick={reload} disabled={busy} aria-label="Refresh funding" title="Refresh"><RefreshCw size={14} aria-hidden="true" /></button>
 	{/snippet}
 	<ul>
 		{#each rows as row (row.provider)}
 			{@const name = providerName(row.provider)}
 			{@const danger = !!row.unusable && row.payer !== 'other'}
-			{@const meTip = row.payer === 'other' ? `@${row.sponsor} pays with their credentials` : row.payer === 'me' ? 'You pay with your credentials' : 'Use your credentials'}
+			{@const held = row.mine && row.payer !== 'me'}
+			{@const meTip = row.payer === 'other' ? `@${row.sponsor} pays with their credentials` : row.payer === 'me' ? 'You pay with your credentials' : held ? `You have given consent${row.payer === 'org' ? '; the organization pays' : ''}` : 'Use your credentials'}
 			<li>
 				<span class="name">
 					{name}
@@ -77,11 +91,11 @@
 				</span>
 				<span class="seg" role="group" aria-label="{name} funding">
 					{#if writer && row.payer !== 'me'}
-						<button class:on={row.payer === 'other'} class:danger class:pending={row.intended === 'me'} disabled={busy} onclick={() => command('funding', row.provider, 'personal')} aria-pressed={row.payer === 'other'} title={tip(row, 'me', `${meTip}${danger ? `\n${row.unusable}` : ''}`)} aria-label={row.payer === 'other' ? `@${row.sponsor} pays; use your credentials` : 'Use your credentials'}>
+						<button class:on={row.payer === 'other'} class:held class:danger class:pending={row.intended === 'me'} disabled={busy} onclick={() => command('funding', row.provider, 'personal')} aria-pressed={row.payer === 'other'} title={tip(row, 'me', `${meTip}${danger ? `\n${row.unusable}` : ''}`)} aria-label={row.payer === 'other' ? `@${row.sponsor} pays; use your credentials` : 'Use your credentials'}>
 							{#if row.payer === 'other'}<span class="initials">{row.sponsor?.slice(0, 2).toUpperCase()}</span>{:else}<User size={15} aria-hidden="true" />{/if}
 						</button>
 					{:else}
-						<span class="state" class:on={row.payer === 'me' || row.payer === 'other'} class:danger class:pending={row.intended === 'me'} role="img" title={tip(row, 'me', `${meTip}${danger ? `\n${row.unusable}` : ''}`)} aria-label={meTip}>
+						<span class="state" class:on={row.payer === 'me' || row.payer === 'other'} class:held class:danger class:pending={row.intended === 'me'} role="img" title={tip(row, 'me', `${meTip}${danger ? `\n${row.unusable}` : ''}`)} aria-label={meTip}>
 							{#if row.payer === 'other'}<span class="initials">{row.sponsor?.slice(0, 2).toUpperCase()}</span>{:else}<User size={15} aria-hidden="true" />{/if}
 						</span>
 					{/if}
@@ -91,9 +105,9 @@
 						<span class="state" class:on={row.payer === 'org'} class:pending={row.intended === 'org'} role="img" title={tip(row, 'org', row.payer === 'org' ? 'The organization pays' : 'Organization credentials')} aria-label={row.payer === 'org' ? 'The organization pays' : 'Organization credentials'}><Building2 size={15} aria-hidden="true" /></span>
 					{/if}
 					{#if row.mine}
-						<button class:on={row.payer === 'none'} disabled={busy} onclick={() => command('withdraw', row.provider)} title="Withdraw your consent{row.payer === 'me' ? '; calls pause until someone else pays' : ''}" aria-label="Withdraw your {name} consent"><X size={15} aria-hidden="true" /></button>
-					{:else if row.payer === 'none'}
-						<span class="state on" role="img" title="No one pays; calls pause" aria-label="No one pays; calls pause"><X size={15} aria-hidden="true" /></span>
+						<button class:on={row.payer === 'none'} class:pending={row.intended === 'none'} disabled={busy} onclick={() => command('withdraw', row.provider)} title={tip(row, 'none', `Withdraw your consent${row.payer === 'me' ? '; calls pause until someone else pays' : ''}`)} aria-label="Withdraw your {name} consent"><X size={15} aria-hidden="true" /></button>
+					{:else if row.payer === 'none' || row.intended === 'none'}
+						<span class="state" class:on={row.payer === 'none'} class:pending={row.intended === 'none'} role="img" title={tip(row, 'none', 'No one pays; calls pause')} aria-label="No one pays; calls pause"><X size={15} aria-hidden="true" /></span>
 					{/if}
 				</span>
 			</li>
@@ -166,6 +180,9 @@
 	}
 	.seg .on {
 		background: var(--accent-soft);
+		color: var(--accent-text);
+	}
+	.seg .held {
 		color: var(--accent-text);
 	}
 	.seg .danger {
