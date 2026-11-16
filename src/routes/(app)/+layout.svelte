@@ -33,7 +33,6 @@
 		gap: var(--s-5);
 		align-content: start;
 		max-width: var(--content-max);
-		margin: 0 auto;
 		padding: var(--s-5);
 	}
 	.skip {
