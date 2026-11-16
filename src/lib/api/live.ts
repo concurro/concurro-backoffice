@@ -1,6 +1,6 @@
 import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { Command, TargetView, CredentialCandidate, CredentialRoute, CredentialRouteId, IssueIntent, IssueRef, ModelProfile, Overview, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns, UsageRow } from '#lib/types.ts';
+import type { Command, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
@@ -38,6 +38,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 		throw new ApiError(response.status, typeof detail === 'string' ? detail : `The request failed (HTTP ${response.status}).`);
 	}
 	return payload as T;
+}
+
+/** Send a credential write under one mutation identity, repeating it once when its reply was lost. */
+async function mutate<T>(method: string, path: string, body: object): Promise<T> {
+	const identified = { ...body, mutation_id: crypto.randomUUID() };
+	try {
+		return await request<T>(method, path, identified);
+	} catch (error) {
+		if (error instanceof ApiError && ![502, 503, 504].includes(error.status)) throw error;
+		return request<T>(method, path, identified);
+	}
 }
 
 const path = (owner: string, repo: string, issue?: number) =>
@@ -114,9 +125,10 @@ export const api = {
 	/** Load jobs only when the selected turn's Runner tab is opened. */
 	turnRuns: (owner: string, repo: string, issue: number, identifier: string) =>
 		request<TurnRuns>('GET', `/api/tasks/${path(owner, repo, issue)}/turns/${encodeURIComponent(identifier)}/runs`),
-	async credentials(): Promise<{ routes: CredentialRoute[]; targets: Target[]; usage: UsageRow[] }> {
+	/** The user's ordered lists, with the targets whose profiles a filter can name. */
+	async credentials(): Promise<CredentialListing & { targets: Target[] }> {
 		const [result, overview] = await Promise.all([
-			request<{ routes: CredentialRoute[]; usage: UsageRow[] }>('GET', '/api/me/credentials'),
+			request<CredentialListing>('GET', '/api/me/credentials'),
 			session.targets.length ? Promise.resolve({ targets: session.targets }) : readOverview()
 		]);
 		return { ...result, targets: overview.targets };
@@ -148,12 +160,18 @@ export const actions = {
 	async refreshTarget(owner: string, repo: string): Promise<void> {
 		await request('POST', `/api/targets/${path(owner, repo)}/refresh`);
 	},
-    async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}): Promise<CredentialRoute> {
-        return request<CredentialRoute>('PUT', '/api/me/credentials/' + id, { secret, ...candidate });
-    },
-	async revokeCredential(id: CredentialRouteId): Promise<CredentialRoute> {
-		return request<CredentialRoute>('DELETE', `/api/me/credentials/${id}`);
-	},
+	addCredential: (type: CredentialTypeId, policy: CredentialPolicy, secret: CredentialSecret) =>
+		mutate<CredentialEntry>('POST', '/api/me/credentials', { type, ...policy, ...secret }),
+	/** Rename, enable or refilter one entry at the revision last read; its token is untouched. */
+	editCredential: (entry: CredentialEntry, changes: Partial<CredentialPolicy & { enabled: boolean }>) =>
+		mutate<CredentialEntry>('PATCH', `/api/me/credentials/${entry.id}`, { revision: entry.revision, ...changes }),
+	replaceCredential: (entry: CredentialEntry, secret: CredentialSecret) =>
+		mutate<CredentialEntry>('PUT', `/api/me/credentials/${entry.id}/secret`, { revision: entry.revision, ...secret }),
+	/** Set one provider's exact priority order at the list revision last read. */
+	reorderCredentials: (list: CredentialList, entries: string[]) =>
+		mutate<CredentialList>('PUT', `/api/me/credentials/order/${list.provider}`, { revision: list.revision, entries }),
+	removeCredential: (entry: CredentialEntry) =>
+		request<CredentialEntry>('DELETE', `/api/me/credentials/${entry.id}?revision=${entry.revision}`),
 	async signOut(): Promise<{ remote: string }> {
         const result = await request<{ remote: string }>('POST', '/auth/logout');
         clearTaskCache();

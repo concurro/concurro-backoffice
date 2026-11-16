@@ -1,0 +1,106 @@
+import type { CredentialEntry, CredentialListing, CredentialPolicy, CredentialSecret, CredentialType, CredentialTypeId, Provider } from '#lib/types.ts';
+import { ago, D, H } from './time';
+
+const types: CredentialType[] = [
+	{ id: 'anthropic_api', provider: 'anthropic', kind: 'api_key', label: 'Anthropic API key', accountId: false },
+	{ id: 'claude_subscription', provider: 'anthropic', kind: 'subscription', label: 'Claude subscription', accountId: false },
+	{ id: 'openai_api', provider: 'openai', kind: 'api_key', label: 'OpenAI API key', accountId: false },
+	{ id: 'chatgpt_subscription', provider: 'openai', kind: 'subscription', label: 'ChatGPT subscription', accountId: true }
+];
+
+let seq = 0;
+const now = () => new Date().toISOString();
+
+function entry(type: CredentialTypeId, name: string, rest: Partial<CredentialEntry> = {}): CredentialEntry {
+	const kind = types.find((t) => t.id === type)!;
+	return {
+		id: `mock-entry-${++seq}`, provider: kind.provider, type, kind: kind.kind, name, enabled: true, roles: [], profiles: [], revision: 1,
+		status: 'valid', statusReason: 'stored', fingerprint: `sha256:mock-${seq}`, version: 1, lastUpdated: ago(3 * H), lastUsed: ago(14),
+		expiresAt: null, expiryKnown: false, accountLabel: kind.accountId ? 'Supplied ChatGPT account (mock)' : null, accountVerified: false, ...rest
+	};
+}
+
+/** In-browser credential lists; they follow the API's revision rules so stale writes fail the same way. */
+export const listing: CredentialListing = $state({
+	providers: [
+		{ provider: 'anthropic', label: 'Anthropic', revision: 1, entries: [
+			entry('anthropic_api', 'Team API key'),
+			entry('claude_subscription', 'Claude Max', { enabled: false, status: 'expired', statusReason: 'expired', lastUpdated: ago(9 * D), lastUsed: ago(2 * D),
+				profiles: [{ target: 'example-org/ledger-core', profile: 'opus55-high' }, { target: 'example-org/retired-service', profile: 'opus55-high' }] })
+		] },
+		{ provider: 'openai', label: 'OpenAI', revision: 1, entries: [
+			entry('openai_api', 'Work API key', { roles: ['triage'], lastUpdated: ago(5 * H), lastUsed: ago(5 * H) }),
+			entry('chatgpt_subscription', 'ChatGPT Plus', { lastUsed: null })
+		] }
+	],
+	types,
+	roles: [
+		{ key: 'triage', label: 'Triage / intake' },
+		{ key: 'planner', label: 'Planning' },
+		{ key: 'plan_reviewers', label: 'Plan review' },
+		{ key: 'implementer', label: 'Implementation' },
+		{ key: 'pr_reviewers', label: 'PR review' }
+	]
+});
+
+/** A refused synthetic write, with the HTTP status the API would answer. */
+export class Refused extends Error {
+	constructor(readonly status: number, message: string) { super(message); }
+}
+
+const group = (provider: Provider) => listing.providers.find((l) => l.provider === provider)!;
+
+function current(id: string, revision: number): CredentialEntry {
+	const found = listing.providers.flatMap((l) => l.entries).find((e) => e.id === id);
+	if (!found) throw new Refused(410, 'credential was removed');
+	if (found.revision !== revision) throw new Refused(409, 'credential changed; refresh before retrying');
+	return found;
+}
+
+function store(target: CredentialEntry, secret: CredentialSecret) {
+	if (!secret.secret.trim()) throw new Refused(422, 'Enter a credential.');
+	if (target.type === 'chatgpt_subscription' && !secret.account_id?.trim()) throw new Refused(422, 'Enter the ChatGPT account ID.');
+	Object.assign(target, { status: 'valid', statusReason: 'stored', fingerprint: `sha256:mock-${secret.secret.length}`, lastUpdated: now(), expiresAt: null, expiryKnown: false });
+}
+
+/** Append a new entry to its provider's list. */
+export function add(type: CredentialTypeId, policy: CredentialPolicy, secret: CredentialSecret): CredentialEntry {
+	const created = entry(type, policy.name, { ...policy, version: 0, lastUsed: null });
+	store(created, secret);
+	created.version = 1;
+	const list = group(created.provider);
+	list.entries.push(created);
+	list.revision += 1;
+	return created;
+}
+
+export function edit(id: string, revision: number, changes: Partial<CredentialPolicy & { enabled: boolean }>): CredentialEntry {
+	const target = current(id, revision);
+	Object.assign(target, changes, { revision: revision + 1 });
+	return target;
+}
+
+/** Store a new token version for one entry without touching its name, filters or position. */
+export function replace(id: string, revision: number, secret: CredentialSecret): CredentialEntry {
+	const target = current(id, revision);
+	store(target, secret);
+	Object.assign(target, { version: (target.version ?? 0) + 1, revision: revision + 1 });
+	return target;
+}
+
+export function reorder(provider: Provider, revision: number, entries: string[]) {
+	const list = group(provider);
+	if (list.revision !== revision || entries.length !== list.entries.length || list.entries.some((e) => !entries.includes(e.id)))
+		throw new Refused(409, 'credential changed; refresh before retrying');
+	list.entries = entries.map((id) => list.entries.find((e) => e.id === id)!);
+	list.revision += 1;
+	return list;
+}
+
+export function remove(id: string, revision: number): CredentialEntry {
+	const target = current(id, revision);
+	const list = group(target.provider);
+	list.entries = list.entries.filter((e) => e.id !== id);
+	list.revision += 1;
+	return target;
+}

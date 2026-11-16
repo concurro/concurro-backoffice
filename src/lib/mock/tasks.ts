@@ -566,11 +566,11 @@ export const tasks: Task[] = [
 		labels: ['bug', 'concurro'],
 		sponsor: ME,
 		paused: 'awaiting_credentials',
-		pauseReason: 'OpenAI API key sk-…41d7 is exhausted. The implementer runs on sol61-high.',
+		pauseReason: 'Every matching OpenAI credential failed. The implementer runs on sol61-high.',
 		alert: {
 			tone: 'caution',
 			title: 'Paused: awaiting credentials',
-			body: 'Your OpenAI API key is exhausted, so the implementer cannot run. Replace the key under My credentials, then run `/concurro resume`. Completed work and budgets are preserved.'
+			body: 'Your ChatGPT subscription is out of quota and no other enabled OpenAI credential matches the implementer. Add, enable or replace a credential under My credentials; the task then continues on its own. Completed work and budgets are preserved.'
 		},
 		plans: [shortPlan('pl_d3c1b8', 1, 2 * D, 'Apply full jitter to every retry delay, including the first.', ['Move jitter into `backoff.delay()` so no caller can skip it.', 'Seed the RNG per job for reproducible tests.'], ['tidepool/backoff.py', 'tests/test_backoff.py'])],
 		approvedPlanId: 'pl_d3c1b8',

@@ -1,37 +1,5 @@
-import type { ActionsRun, ActivityItem, CredentialRoute, UsageRow } from '#lib/types.ts';
+import type { ActionsRun, ActivityItem, UsageRow } from '#lib/types.ts';
 import { ago, D, H } from './time';
-
-export const credentials: CredentialRoute[] = [
-	{
-		id: 'anthropic_api',
-		label: 'Anthropic API key',
-		provider: 'anthropic',
-		kind: 'API key',
-		status: 'valid',
-		fingerprint: 'sk-ant-…9f3a',
-		lastUpdated: ago(3 * H),
-		lastUsed: ago(14), route: 'anthropic-api-key', registrationAvailable: true
-	},
-	{ id: 'claude_subscription', label: 'Claude subscription', provider: 'anthropic', kind: 'Subscription', status: 'missing', route: 'claude-subscription', registrationAvailable: true, note: 'Sign in locally with the CLI, then paste the token. Token problems are reported during execution.' },
-	{
-		id: 'openai_api',
-		label: 'OpenAI API key',
-		provider: 'openai',
-		kind: 'API key',
-		status: 'exhausted', route: 'openai-api-key', registrationAvailable: true,
-		fingerprint: 'sk-…41d7',
-		lastUpdated: ago(5 * H),
-		lastUsed: ago(5 * H),
-		note: 'Synthetic quota status. Each task follows its configured funding policy.'
-	},
-	{
-		id: 'chatgpt_subscription', route: 'chatgpt-subscription', registrationAvailable: true,
-		label: 'ChatGPT subscription',
-		provider: 'openai',
-		kind: 'Subscription',
-		status: 'missing'
-	}
-];
 
 /** Tokens (thousands) by sponsored task and model profile, last 7 days. */
 export const usage: UsageRow[] = [

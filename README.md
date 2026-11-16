@@ -125,8 +125,10 @@ Targets and their task details require write, maintain or admin permission on th
 repository. Fork write permission is not required. The API enforces this for direct URLs as
 well; command controls follow the returned writer permission.
 
-The portal renders provider-specific consent, coverage, recorded charges and recovery receipts.
-Personal API-key and CLI-token forms validate, replace and revoke credentials on fixed routes.
+The portal renders provider-specific consent, selected credentials, recorded charges and recovery receipts.
+My credentials lists each provider's saved API keys and subscription tokens in priority order.
+Entries are added, renamed, enabled, filtered by role or model profile, reordered by drag or
+move buttons, given a new token and removed independently.
 Contributed tasks use selected personal credentials without organization fallback. GitHub
 sign-out reports local completion separately from remote access-token cleanup. Nonwriters
 retain identity-bound self-withdrawal and their own consent view, not full target/task data.
@@ -134,8 +136,11 @@ retain identity-bound self-withdrawal and their own consent view, not full targe
 Issue funding controls select organization or personal credentials independently for each
 provider. “Use my credentials” posts `funding` with `<provider> personal`; organization selection
 uses `<provider> org`. Both require upstream write permission. Withdrawal keeps the selected
-personal payer policy and pauses without coverage; it never falls back to organization funding.
+personal payer policy and pauses without a matching credential; it never falls back to organization funding.
 Current provider choices, prospective consent and historical charged attempts remain separate
 in live and mock modes.
 
-Personal credentials are saved without provider validation or model selection. The configured task model is used during execution, where authentication and model-access errors follow the normal credential recovery flow. Saving a replacement retires the previous version.
+Personal credentials are saved without provider validation or model selection. A task uses the
+first enabled entry that matches its role and profile; a rejected token is reported during
+execution, where the next matching entry is tried. Writes name the revision last read, so a
+list changed elsewhere is reloaded instead of overwritten.

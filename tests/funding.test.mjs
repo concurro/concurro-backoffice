@@ -6,7 +6,7 @@ import { compileModule } from 'svelte/compiler';
 import ts from 'typescript';
 
 const source = await readFile(new URL('../src/lib/state/store.svelte.ts', import.meta.url), 'utf8');
-const fixture = `const credentials = []; const tasks = []; const reviews = [{ owner: 'up', repo: 'project', pr: 9, round: 2, stage: 'review', active: true, alert: {}, updatedAt: '' }]; const targets = []; const ME = 'mkeller'; const MOCK_ACTOR_ID = 42;`;
+const fixture = `const tasks = []; const reviews = [{ owner: 'up', repo: 'project', pr: 9, round: 2, stage: 'review', active: true, alert: {}, updatedAt: '' }]; const targets = []; const ME = 'mkeller'; const MOCK_ACTOR_ID = 42;`;
 const javascript = ts.transpileModule(fixture + source.replace(/^import .*;$/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
 const { js } = compileModule(javascript, { filename: 'funding.svelte.js', generate: 'client' });
 const output = new URL('../.svelte-kit/funding-test.mjs', import.meta.url);

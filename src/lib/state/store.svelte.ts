@@ -1,8 +1,7 @@
-import { credentials } from '#lib/mock/account.ts';
 import { ME, MOCK_ACTOR_ID, targets } from '#lib/mock/reference.ts';
 import { reviews } from '#lib/mock/reviews.ts';
 import { tasks } from '#lib/mock/tasks.ts';
-import type { Command, CredentialCandidate, CredentialRouteId, IssueIntent, IssueRef, Provider, ReviewCommand, Sponsorship, Stage, Task } from '#lib/types.ts';
+import type { Command, IssueIntent, IssueRef, Provider, ReviewCommand, Sponsorship, Stage, Task } from '#lib/types.ts';
 
 /** In-browser mock state. Mutations stay local; nothing leaves the page. */
 for (const task of tasks) {
@@ -17,11 +16,17 @@ for (const task of tasks) {
         task.sponsorships.funding = 'mixed';
         task.sponsorships.provider_funding = { openai: 'contributed', anthropic: 'org' };
         task.sponsorships.task_stage = task.paused;
-        task.sponsorships.recovery = { eligible: task.paused === 'awaiting_credentials' && task.budgets.modelCalls.used < task.budgets.modelCalls.max, not_before: Date.now() / 1000 + 90 };
         const requirements = targets.find((target) => target.owner === task.owner && target.repo === task.repo)?.credentialRequirements ?? [];
+        const paused = requirements.find((r) => r.provider === 'openai' && r.role === 'implementer') ?? requirements.find((r) => r.provider === 'openai');
+        task.sponsorships.recovery = {
+            eligible: task.paused === 'awaiting_credentials' && task.budgets.modelCalls.used < task.budgets.modelCalls.max,
+            requirement: { provider: 'openai', role: paused?.role, profile: paused?.profile, model: paused?.model },
+            candidate: null, wake_at: null, consumed: [],
+            failures: [{ category: 'quota_exhausted', binding: { route: 'chatgpt-subscription', credential_version: 1 } }]
+        };
         task.sponsorships.coverage = {
-            openai: requirements.filter((r) => r.provider === 'openai').map((r) => ({ ...r, status: 'reconnect', version: 1 })),
-            anthropic: requirements.filter((r) => r.provider === 'anthropic').map((r) => ({ ...r, status: 'available', version: 1 }))
+            openai: requirements.filter((r) => r.provider === 'openai').map((r) => r.role === 'triage' ? { ...r, status: 'available', version: 1, entry: 'Work API key' } : { ...r, route: 'chatgpt-subscription', status: 'available', version: 1, entry: 'ChatGPT Plus' }),
+            anthropic: requirements.filter((r) => r.provider === 'anthropic').map((r) => ({ ...r, status: 'available', version: 1, entry: 'Team API key' }))
         };
         const total = task.budgets.modelCalls.used;
         task.sponsorships.charged_calls = [
@@ -34,10 +39,10 @@ for (const task of tasks) {
             { request: 'synthetic-provider', source: 'provider', completed: true, category: null, usage: { input_tokens: 2, output_tokens: 3 }, binding: { sponsorship_provider: 'anthropic', sponsor: '84', credential_version: 1 } }
         ];
         task.stage = task.paused;
-        task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Saved replacement credentials can schedule recovery after current consent, required coverage, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
+        task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Every matching credential failed. Add, enable, reorder or replace a credential and the paused call is selected again after consent, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };
     }
 }
-export const store = $state({ tasks, reviews, credentials, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
+export const store = $state({ tasks, reviews, issues: [{ owner: 'example-org', repo: 'ledger-core', issue: 501, title: 'Pre-enrollment sponsorship', author: 'jvoss', labels: [], updatedAt: new Date().toISOString(), sponsorships: { funding: 'org', provider_funding: { openai: 'org', anthropic: 'org' }, status: 'confirmed', slots: { anthropic: { sponsor_id: '84', login: 'jvoss', status: 'active' } } } } as IssueIntent] });
 
 let seq = 0;
 const now = () => new Date().toISOString();
@@ -141,34 +146,11 @@ export function runCommand(issue: IssueRef, command: Command, arg = ''): string 
 	}
 }
 
-/** Simulate credential storage without retaining token/account inputs. */
-export function saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
-	const route = store.credentials.find((c) => c.id === id)!;
-	if (!secret.trim()) throw new Error('Enter a credential.');
-    if (id === 'chatgpt_subscription' && !candidate.account_id?.trim()) throw new Error('Enter the ChatGPT account ID.');
-	route.status = 'valid';
-    route.statusReason = 'stored';
-    route.version = (route.version ?? 0) + 1;
-    route.expiryKnown = false;
-    route.expiresAt = null;
-    route.accountLabel = id === 'chatgpt_subscription' ? 'Supplied ChatGPT account (mock)' : null;
-    route.accountVerified = false;
-	route.fingerprint = 'sha256:mock-' + secret.length;
-	route.lastUpdated = now();
-	route.note = undefined;
+/** A change to the signed-in user's list lets their paused tasks select again, as the service would on its next poll. */
+export function credentialsChanged(provider: Provider) {
     for (const task of store.tasks) {
         const projection = task.sponsorships;
-        if (projection?.provider_funding?.[route.provider] !== 'contributed' || projection.task_stage !== 'awaiting_credentials' || !projection.recovery?.eligible || projection.slots[route.provider]?.sponsor_id !== String(MOCK_ACTOR_ID)) continue;
-        projection.coverage?.[route.provider]?.forEach((requirement) => {
-            if (requirement.route === route.route) { requirement.status = 'available'; requirement.version = route.version; }
-        });
-        if (Object.values(projection.coverage ?? {}).flat().every((requirement) => requirement.status === 'available')) projection.recovery.delivery = { id: 'mock-save-' + route.version, due_at: Math.max(Date.now() / 1000, projection.recovery.not_before) };
+        if (projection?.provider_funding?.[provider] !== 'contributed' || projection.task_stage !== 'awaiting_credentials' || !projection.recovery?.eligible || projection.slots[provider]?.sponsor_id !== String(MOCK_ACTOR_ID)) continue;
+        projection.recovery.delivery = { id: `mock-change-${++seq}`, due_at: Date.now() / 1000, reason: 'observed' };
     }
-}
-
-export function revokeCredential(id: CredentialRouteId) {
-	const route = store.credentials.find((c) => c.id === id)!;
-	route.status = 'revoked';
-    route.lastUpdated = now();
-	route.note = 'Stored personal credential revoked. Current org-paid calls are unaffected.';
 }

@@ -1,8 +1,9 @@
 import { cached, clearTaskCache } from './cache.svelte.ts';
 import { api as fixtures, NotFound } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
-import { revokeCredential, runCommand, runReviewCommand, saveCredential, store } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialCandidate, CredentialRouteId, IssueRef, Overview, Report, ReviewCommand, ReviewView, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
+import * as credentials from '#lib/mock/credentials.svelte.ts';
+import { credentialsChanged, runCommand, runReviewCommand } from '#lib/state/store.svelte.ts';
+import type { Command, CredentialEntry, CredentialList, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueRef, Provider, Overview, Report, ReviewCommand, ReviewView, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
 import { apply } from './events.ts';
 import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
@@ -74,6 +75,17 @@ export const api = {
 	index: fixtures.index
 };
 
+/** Apply a synthetic credential write, failing as the API does and waking the tasks it could unblock. */
+function write<T extends { provider: Provider }>(change: () => T): T {
+	try {
+		const result = change();
+		credentialsChanged(result.provider);
+		return result;
+	} catch (error) {
+		throw error instanceof credentials.Refused ? new ApiError(error.status, error.message) : error;
+	}
+}
+
 /** Fixtures have no stream behind them: changes come from commands applied in the browser. */
 export const followChanges = () => () => {};
 
@@ -93,14 +105,14 @@ export const actions = {
     },
 	/** Fixtures have no GitHub behind them; the views simply reload. */
 	async refreshTarget(_owner: string, _repo: string) {},
-	async saveCredential(id: CredentialRouteId, secret: string, candidate: CredentialCandidate = {}) {
-		try { saveCredential(id, secret, candidate); }
-		catch (error) { throw new ApiError(422, error instanceof Error ? error.message : 'Synthetic save failed.'); }
-		return store.credentials.find((c) => c.id === id)!;
-	},
-	async revokeCredential(id: CredentialRouteId) {
-		revokeCredential(id);
-		return store.credentials.find((c) => c.id === id)!;
-	},
+	addCredential: async (type: CredentialTypeId, policy: CredentialPolicy, secret: CredentialSecret) =>
+		write(() => credentials.add(type, policy, secret)),
+	editCredential: async (entry: CredentialEntry, changes: Partial<CredentialPolicy & { enabled: boolean }>) =>
+		write(() => credentials.edit(entry.id, entry.revision, changes)),
+	replaceCredential: async (entry: CredentialEntry, secret: CredentialSecret) =>
+		write(() => credentials.replace(entry.id, entry.revision, secret)),
+	reorderCredentials: async (list: CredentialList, entries: string[]) =>
+		write(() => credentials.reorder(list.provider, list.revision, entries)),
+	removeCredential: async (entry: CredentialEntry) => write(() => credentials.remove(entry.id, entry.revision)),
     signOut: async () => { clearTaskCache(); return { remote: 'revoked' }; }
 };

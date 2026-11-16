@@ -48,16 +48,19 @@ export interface RosterEntry {
 	profile: string;
 }
 
-/** Trusted configured route, separate from the CLI harness and display model profile. */
+/** One role's call and the credential entry it would select. */
 export interface CredentialRequirement {
     role: string;
     profile: string;
     model: string;
     route: string | null;
     provider: Provider | null;
+    /** `available`, `reconnect`, `missing`, `unknown` or `unassigned`. */
     status?: string;
-    /** Exact current credential version, absent when no record is available. */
+    /** Exact current credential version, absent when no entry is selected. */
     version?: number | null;
+    /** Name of the list entry this call would select now. */
+    entry?: string | null;
 }
 
 /** An issue identity works before a task checkpoint exists. */
@@ -72,16 +75,22 @@ export interface SponsorSlot {
     provenance?: string;
 }
 
-/** Automatic recovery is a scheduling receipt, never permission to skip admission checks. */
+/** The paused call's next credential selection; never permission to skip admission checks. */
 export interface CredentialRecovery {
-    /** Whether recorded consent and failure class permit automatic reconsideration. */
+    /** Whether recorded consent, failure class and budget permit automatic selection. */
     eligible: boolean;
-    /** Durable earliest retry time in Unix seconds. */
-    not_before: number;
-    /** Current source-validated delivery, if every required route has candidate evidence. */
-    delivery?: { id: string; due_at: number };
-    /** Delivery already checked; it does not represent a queued retry. */
-    consumed?: string | null;
+    /** The call that paused, as selection names it. */
+    requirement?: { provider?: Provider | null; role?: string | null; profile?: string | null; model?: string | null };
+    /** The list entry the call would select now, if any. */
+    candidate?: { entry_id?: string | null } | null;
+    /** When the earliest cooling credential is due, in Unix seconds. */
+    wake_at?: number | null;
+    /** The queued selection and the earliest time it runs, in Unix seconds. */
+    delivery?: { id: string; due_at: number; reason?: string };
+    /** Deliveries already acted on; none of them is a queued selection. */
+    consumed?: string[];
+    /** Trusted failures the pause recorded. */
+    failures?: { category?: string | null; binding?: { route?: string | null; credential_version?: number | null } }[];
     /** Last recovery check outcome. */
     status?: string;
 }
@@ -425,39 +434,81 @@ export interface Turn {
 	diff?: string;
 }
 
-export type CredentialRouteId =
+export type CredentialTypeId =
 	| 'anthropic_api'
 	| 'claude_subscription'
 	| 'openai_api'
 	| 'chatgpt_subscription';
-export type CredentialStatus = 'valid' | 'invalid' | 'expired' | 'exhausted' | 'revoked' | 'missing';
+/** Stored state of an entry's current token; `valid` never claims the provider accepted it. */
+export type CredentialStatus = 'valid' | 'invalid' | 'expired' | 'revoked';
 
-/** Write-only candidate metadata for credential storage. */
-export interface CredentialCandidate {
-    /** Supplied ChatGPT account header; not authenticated account identity. */
-    account_id?: string;
+/** One target's profile key; `target` is the upstream `owner/repo`. */
+export interface ProfileFilter {
+	target: string;
+	profile: string;
 }
 
-export interface CredentialRoute {
-	id: CredentialRouteId;
-	label: string;
+/** What an entry may be used for; an empty filter matches all work. */
+export interface CredentialPolicy {
+	name: string;
+	roles: string[];
+	profiles: ProfileFilter[];
+}
+
+/** Write-only token and, for ChatGPT, the account ID supplied with it. */
+export interface CredentialSecret {
+	secret: string;
+	account_id?: string;
+}
+
+/** One saved credential in a provider's ordered list. */
+export interface CredentialEntry extends CredentialPolicy {
+	id: string;
 	provider: Provider;
-	kind: 'API key' | 'Subscription';
+	type: CredentialTypeId;
+	kind: 'api_key' | 'subscription';
+	enabled: boolean;
+	/** Changes with every edit of this entry; writes name the revision last read. */
+	revision: number;
 	status: CredentialStatus;
-	fingerprint?: string;
-	lastUpdated?: string;
-	lastUsed?: string;
-	note?: string;
-    route?: string | null;
-    registrationAvailable?: boolean;
-    version?: number;
-    expiresAt?: string | null;
-    expiryKnown?: boolean;
-    statusReason?: string | null;
-    /** Opaque account hint supplied with this credential version. */
-    accountLabel?: string | null;
-    /** True only with authenticated evidence, never merely a successful probe. */
-    accountVerified?: boolean;
+	statusReason?: string | null;
+	fingerprint?: string | null;
+	version?: number | null;
+	lastUpdated?: string | null;
+	lastUsed?: string | null;
+	expiresAt?: string | null;
+	expiryKnown?: boolean;
+	/** Opaque account hint supplied with this credential version. */
+	accountLabel?: string | null;
+	/** True only with authenticated evidence. */
+	accountVerified?: boolean;
+}
+
+/** A provider's entries in priority order. */
+export interface CredentialList {
+	provider: Provider;
+	label: string;
+	/** Changes with every reorder, addition or removal; a reorder names the revision last read. */
+	revision: number;
+	entries: CredentialEntry[];
+}
+
+/** A credential type a new entry may take. */
+export interface CredentialType {
+	id: CredentialTypeId;
+	provider: Provider;
+	kind: CredentialEntry['kind'];
+	label: string;
+	/** Whether the token is stored with a supplied account ID. */
+	accountId: boolean;
+}
+
+/** `GET /api/me/credentials`. */
+export interface CredentialListing {
+	providers: CredentialList[];
+	types: CredentialType[];
+	/** Role filter keys with their display labels, in workflow order. */
+	roles: { key: string; label: string }[];
 }
 
 export interface UsageRow {

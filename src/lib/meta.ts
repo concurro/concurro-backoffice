@@ -144,9 +144,7 @@ export const credentialMeta: Record<CredentialStatus, Meta> = {
 	invalid: { label: 'Invalid', tone: 'danger', icon: CircleX },
 	valid: m('Saved', 'success', CircleCheck),
 	expired: m('Expired', 'warning', Clock),
-	exhausted: m('Exhausted', 'danger', CircleAlert),
-	revoked: m('Revoked', 'neutral', Ban),
-	missing: m('Not configured', 'neutral', CircleDashed)
+	revoked: m('Revoked', 'neutral', Ban)
 };
 
 export const alertMeta: Record<AlertTone, Meta> = {
