@@ -77,6 +77,7 @@ export const api = {
 			const task = findTask(owner, repo, issue);
 			return { task, turns: turnsFor(task) };
 		}),
+	credentialListing: () => delay(read),
 	credentials: () => delay(() => ({ ...read(), targets })),
 	sponsorships: () => delay(() => [...store.tasks, ...store.issues].filter((t) => Object.values(t.sponsorships?.slots ?? {}).some((s) => s?.sponsor_id === String(MOCK_ACTOR_ID)) || t.sponsorships?.facts?.some((f) => f.actor_id === String(MOCK_ACTOR_ID)))),
 	operator: () => delay(() => operator),

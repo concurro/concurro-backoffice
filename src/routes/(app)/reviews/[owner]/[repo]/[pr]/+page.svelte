@@ -10,6 +10,7 @@
 	import Meter from '#lib/components/Meter.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Panel from '#lib/components/Panel.svelte';
+	import FundingAudit from '#lib/components/FundingAudit.svelte';
 	import ProviderSponsorship from '#lib/components/ProviderSponsorship.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import FindingsTable from '#lib/components/task/FindingsTable.svelte';
@@ -150,6 +151,7 @@
 					rule="Only the reviewer who raised a finding can mark it fixed or obsolete, and only in a later round."
 				/>
 			</Panel>
+			{#if task.sponsorships && task.sponsorships.scope !== 'own'}<FundingAudit projection={task.sponsorships} />{/if}
 		</div>
 		<div class="col">
 			<Panel title="Budget" id="budgets">

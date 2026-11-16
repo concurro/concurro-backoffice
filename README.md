@@ -133,12 +133,14 @@ Contributed tasks use selected personal credentials without organization fallbac
 sign-out reports local completion separately from remote access-token cleanup. Nonwriters
 retain identity-bound self-withdrawal and their own consent view, not full target/task data.
 
-Issue funding controls select organization or personal credentials independently for each
-provider. “Use my credentials” posts `funding` with `<provider> personal`; organization selection
-uses `<provider> org`. Both require upstream write permission. Withdrawal keeps the selected
-personal payer policy and pauses without a matching credential; it never falls back to organization funding.
-Current provider choices, prospective consent and historical charged attempts remain separate
-in live and mock modes.
+The Funding panel sets each provider's payer with a three-part control: you (person), the
+organization (building) and, when you hold consent, withdraw (✕). The person icon turns red,
+with the reason on hover, when your own credentials cannot serve that provider. “You” posts
+`funding` with `<provider> personal`; the organization uses `<provider> org`. Both require
+upstream write permission. Withdrawal keeps the selected personal payer policy and pauses
+without a matching credential; it never falls back to organization funding. Writers find
+coverage, charged attempts and gateway evidence under Funding audit on the task or review;
+your own charges and consent receipts are on My sponsorships.
 
 Personal credentials are saved without provider validation or model selection. A task uses the
 first enabled entry that matches its role and profile; a rejected token is reported during

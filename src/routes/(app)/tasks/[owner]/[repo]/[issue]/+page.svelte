@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ExternalLink, GitPullRequest, SquareTerminal } from 'lucide-svelte';
 	import Alert from '#lib/components/Alert.svelte';
+	import FundingAudit from '#lib/components/FundingAudit.svelte';
 	import ProviderSponsorship from '#lib/components/ProviderSponsorship.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Badge from '#lib/components/Badge.svelte';
@@ -140,6 +141,7 @@
 					<ReadinessPanel task={phaseTask} {ciLoading} />
 				{/if}
 			{:else if !phaseData?.error}<Skeleton rows={6} />{/if}
+			{#if task.sponsorships && task.sponsorships.scope !== 'own'}<FundingAudit projection={task.sponsorships} />{/if}
 		</div>
 		<div class="col">
 			<Panel title="Budgets" id="budgets">

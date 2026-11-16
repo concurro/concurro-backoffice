@@ -69,6 +69,7 @@ export const api = {
 			jobs: run.jobs?.map((job, n) => ({ ...job, id: n, url, status: 'completed', conclusion: job.status, runner: run.runner, labels: [] })) ?? null
 		}] };
 	},
+	credentialListing: fixtures.credentialListing,
 	credentials: fixtures.credentials,
 	sponsorships: fixtures.sponsorships,
 	operator: fixtures.operator,

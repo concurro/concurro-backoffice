@@ -125,10 +125,12 @@ export const api = {
 	/** Load jobs only when the selected turn's Runner tab is opened. */
 	turnRuns: (owner: string, repo: string, issue: number, identifier: string) =>
 		request<TurnRuns>('GET', `/api/tasks/${path(owner, repo, issue)}/turns/${encodeURIComponent(identifier)}/runs`),
+	/** The user's ordered lists alone. */
+	credentialListing: () => request<CredentialListing>('GET', '/api/me/credentials'),
 	/** The user's ordered lists, with the targets whose profiles a filter can name. */
 	async credentials(): Promise<CredentialListing & { targets: Target[] }> {
 		const [result, overview] = await Promise.all([
-			request<CredentialListing>('GET', '/api/me/credentials'),
+			api.credentialListing(),
 			session.targets.length ? Promise.resolve({ targets: session.targets }) : readOverview()
 		]);
 		return { ...result, targets: overview.targets };
