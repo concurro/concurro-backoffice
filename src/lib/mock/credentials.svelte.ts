@@ -21,7 +21,7 @@ function entry(type: CredentialTypeId, name: string, rest: Partial<CredentialEnt
 }
 
 /** In-browser credential lists; they follow the API's revision rules so stale writes fail the same way. */
-export const listing: CredentialListing = $state({
+const listing: CredentialListing = $state({
 	providers: [
 		{ provider: 'anthropic', label: 'Anthropic', revision: 1, entries: [
 			entry('anthropic_api', 'Team API key'),
@@ -43,6 +43,9 @@ export const listing: CredentialListing = $state({
 	]
 });
 
+/** The lists as a response carries them: a copy that later writes do not reach. */
+export const read = (): CredentialListing => $state.snapshot(listing);
+
 /** A refused synthetic write, with the HTTP status the API would answer. */
 export class Refused extends Error {
 	constructor(readonly status: number, message: string) { super(message); }
@@ -55,6 +58,13 @@ function current(id: string, revision: number): CredentialEntry {
 	if (!found) throw new Refused(410, 'credential was removed');
 	if (found.revision !== revision) throw new Refused(409, 'credential changed; refresh before retrying');
 	return found;
+}
+
+/** Record a change to one entry: its own revision and its list's both advance. */
+function changed(target: CredentialEntry, fields: Partial<CredentialEntry>): CredentialEntry {
+	Object.assign(target, fields, { revision: target.revision + 1 });
+	group(target.provider).revision += 1;
+	return $state.snapshot(target);
 }
 
 function store(target: CredentialEntry, secret: CredentialSecret) {
@@ -71,21 +81,18 @@ export function add(type: CredentialTypeId, policy: CredentialPolicy, secret: Cr
 	const list = group(created.provider);
 	list.entries.push(created);
 	list.revision += 1;
-	return created;
+	return $state.snapshot(created);
 }
 
 export function edit(id: string, revision: number, changes: Partial<CredentialPolicy & { enabled: boolean }>): CredentialEntry {
-	const target = current(id, revision);
-	Object.assign(target, changes, { revision: revision + 1 });
-	return target;
+	return changed(current(id, revision), changes);
 }
 
 /** Store a new token version for one entry without touching its name, filters or position. */
 export function replace(id: string, revision: number, secret: CredentialSecret): CredentialEntry {
 	const target = current(id, revision);
 	store(target, secret);
-	Object.assign(target, { version: (target.version ?? 0) + 1, revision: revision + 1 });
-	return target;
+	return changed(target, { version: (target.version ?? 0) + 1 });
 }
 
 export function reorder(provider: Provider, revision: number, entries: string[]) {
@@ -94,7 +101,7 @@ export function reorder(provider: Provider, revision: number, entries: string[])
 		throw new Refused(409, 'credential changed; refresh before retrying');
 	list.entries = entries.map((id) => list.entries.find((e) => e.id === id)!);
 	list.revision += 1;
-	return list;
+	return $state.snapshot(list);
 }
 
 export function remove(id: string, revision: number): CredentialEntry {
@@ -102,5 +109,5 @@ export function remove(id: string, revision: number): CredentialEntry {
 	const list = group(target.provider);
 	list.entries = list.entries.filter((e) => e.id !== id);
 	list.revision += 1;
-	return target;
+	return $state.snapshot(target);
 }

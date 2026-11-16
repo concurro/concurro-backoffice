@@ -1,5 +1,5 @@
 import { profile } from '#lib/api/session.svelte.ts';
-import type { CredentialPolicy, CredentialRecovery, ProfileFilter, Provider, Target } from '#lib/types.ts';
+import type { CredentialEntry, CredentialPolicy, CredentialRecovery, ProfileFilter, Provider, Target } from '#lib/types.ts';
 
 /** A profile a filter can name; `model` is absent while its target or profile is unavailable. */
 export interface ProfileOption extends ProfileFilter {
@@ -32,3 +32,6 @@ export function filterSummary(policy: CredentialPolicy, roles: { key: string; la
 /** Whether a selection of the paused call is queued and not yet acted on. */
 export const recoveryQueued = (recovery?: CredentialRecovery | null) =>
 	!!recovery?.eligible && !!recovery.delivery && !recovery.consumed?.includes(recovery.delivery.id);
+
+/** An entry as a later listing has it, with the revision its next write must name; absent once removed. */
+export const currentEntry = (entries: CredentialEntry[], entry: CredentialEntry) => entries.find((found) => found.id === entry.id);

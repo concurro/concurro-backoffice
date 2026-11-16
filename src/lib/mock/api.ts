@@ -1,7 +1,7 @@
 import { store } from '#lib/state/store.svelte.ts';
 import type { ReviewTask, Target, Task } from '#lib/types.ts';
 import { activity, runsFor } from './account';
-import { listing } from './credentials.svelte.ts';
+import { read } from './credentials.svelte.ts';
 import { operator } from './operator';
 import { MOCK_ACTOR_ID, targets } from './reference';
 import { reportsFor, reviewSummary } from './reviews';
@@ -77,7 +77,7 @@ export const api = {
 			const task = findTask(owner, repo, issue);
 			return { task, turns: turnsFor(task) };
 		}),
-	credentials: () => delay(() => ({ ...listing, targets })),
+	credentials: () => delay(() => ({ ...read(), targets })),
 	sponsorships: () => delay(() => [...store.tasks, ...store.issues].filter((t) => Object.values(t.sponsorships?.slots ?? {}).some((s) => s?.sponsor_id === String(MOCK_ACTOR_ID)) || t.sponsorships?.facts?.some((f) => f.actor_id === String(MOCK_ACTOR_ID)))),
 	operator: () => delay(() => operator),
 	/** Synchronous index for the command palette. */

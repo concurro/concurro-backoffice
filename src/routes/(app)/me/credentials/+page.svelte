@@ -14,7 +14,7 @@
 	import TokenFields from '#lib/components/credentials/TokenFields.svelte';
 	import UseFor from '#lib/components/credentials/UseFor.svelte';
 	import { actions, ApiError, MOCK, session } from '#lib/api/index.ts';
-	import { filterSummary, profileOptions } from '#lib/credentials.ts';
+	import { currentEntry, filterSummary, profileOptions } from '#lib/credentials.ts';
 	import { relTime, taskHref } from '#lib/format.ts';
 	import { credentialMeta } from '#lib/meta.ts';
 	import { needsYou } from '#lib/needs-you.ts';
@@ -33,11 +33,23 @@
 	let announcement = $state('');
 	let expanded = $state<Record<string, boolean>>({});
 
+	/** Show a listing that was read, and point open dialogs at its revisions; a dialog whose entry is gone closes. */
+	function show(value: CredentialListing & { targets: Target[] }) {
+		listing = value;
+		failure = null;
+		preview = null;
+		const entries = value.providers.flatMap((list) => list.entries);
+		const current = (entry: CredentialEntry | null, close: () => void) => {
+			const found = entry && currentEntry(entries, entry);
+			if (entry && !found) { close(); toast(`${entry.name} was removed elsewhere.`, 'warning'); }
+			return found ?? null;
+		};
+		if (formOpen) form.entry = current(form.entry, () => (formOpen = false));
+		if (replaceOpen) replacing = current(replacing, () => (replaceOpen = false));
+		if (removeOpen) removing = current(removing, () => (removeOpen = false));
+	}
 	$effect(() => {
-		data.result.then(
-			(value) => { listing = value; failure = null; preview = null; },
-			(error) => { failure = error; }
-		);
+		data.result.then(show, (error) => { failure = error; });
 	});
 
 	const paused = $derived(needsYou(session.tasks).filter((item) => item.kind === 'credentials'));
@@ -59,7 +71,8 @@
 			toast(stale ? 'Your credentials changed elsewhere. The list was reloaded; try again.' : known ? error.message : 'Outcome unknown. Checking your current credentials.', 'danger');
 			return false;
 		} finally {
-			await invalidateAll().catch(() => {});
+			// The next write is allowed only once the lists it will name have been read.
+			await invalidateAll().then(() => data.result).then(show, () => {});
 			busy = false;
 		}
 	}
