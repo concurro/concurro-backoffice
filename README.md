@@ -127,8 +127,8 @@ well; command controls follow the returned writer permission.
 
 The portal renders provider-specific consent, selected credentials, recorded charges and recovery receipts.
 My credentials lists each provider's saved API keys and subscription tokens in priority order.
-Entries are added, renamed, enabled, filtered by role or model profile, reordered by drag or
-move buttons, given a new token and removed independently.
+Entries are added, renamed, enabled, filtered by role or model profile, reordered with a handle
+(drag it, or press the arrow keys while it has focus), given a new token and removed independently.
 Contributed tasks use selected personal credentials without organization fallback. GitHub
 sign-out reports local completion separately from remote access-token cleanup. Nonwriters
 retain identity-bound self-withdrawal and their own consent view, not full target/task data.

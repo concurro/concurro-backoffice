@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
-	import { ChevronDown, ChevronRight, ChevronUp, Ellipsis, GripVertical, KeyRound, LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-svelte';
+	import { ChevronRight, Ellipsis, GripVertical, KeyRound, LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-svelte';
 	import { tick } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import Alert from '#lib/components/Alert.svelte';
@@ -28,7 +28,7 @@
 	let failure = $state<unknown>(null);
 	/** An order shown before the list that confirms it has been read again. */
 	let preview = $state<{ provider: string; ids: string[] } | null>(null);
-	let dragging = $state<string | null>(null);
+	let dragging = $state<{ list: CredentialList; entry: CredentialEntry } | null>(null);
 	let busy = $state(false);
 	let announcement = $state('');
 	let expanded = $state<Record<string, boolean>>({});
@@ -83,30 +83,45 @@
 		if (await write(() => actions.reorderCredentials(list, ids), `${list.label} order saved`)) announcement = `${moved.name} is now ${position} of ${ids.length}.`;
 		else preview = null;
 	}
-	/** Move one entry a step and keep keyboard focus on it, on the opposite button once it reaches an end. */
-	async function move(list: CredentialList, index: number, delta: number) {
-		const ids = list.entries.map((entry) => entry.id);
-		const moved = list.entries[index];
-		[ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
-		await reorder(list, ids, moved);
-		await tick();
-		const button = (direction: number) => document.querySelector<HTMLButtonElement>(`[data-move="${moved.id}:${direction}"]`);
-		(button(delta)?.disabled ? button(-delta) : button(delta))?.focus();
+	/** The entry of `list` under a pointer position, if any. */
+	function entryAt(list: CredentialList, x: number, y: number) {
+		const id = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-entry]')?.dataset.entry;
+		return list.entries.find((entry) => entry.id === id);
 	}
-	function dragOver(event: DragEvent, list: CredentialList, over: CredentialEntry) {
-		if (!dragging || !list.entries.some((entry) => entry.id === dragging)) return;
-		event.preventDefault();
-		const ids = ordered(list).map((entry) => entry.id);
-		if (over.id === dragging) return;
-		ids.splice(ids.indexOf(over.id), 0, ...ids.splice(ids.indexOf(dragging), 1));
+	/** Reorder with the handle: drag it with a mouse, pen or finger, or press the arrow keys while it has focus. */
+	const handle = (list: CredentialList, entry: CredentialEntry) => ({
+		onpointerdown(event: PointerEvent) {
+			if (busy || event.button !== 0) return;
+			event.preventDefault();
+			dragging = { list, entry };
+		},
+		onkeydown(event: KeyboardEvent) {
+			const delta = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+			const index = list.entries.indexOf(entry);
+			if (!delta || busy || !list.entries[index + delta]) return;
+			event.preventDefault();
+			const ids = list.entries.map((item) => item.id);
+			[ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
+			// Moving the row drops focus; return it to this entry's handle for the next key press.
+			reorder(list, ids, entry).then(tick).then(() => document.querySelector<HTMLElement>(`[data-entry="${entry.id}"] .grip`)?.focus());
+		}
+	});
+	/** A drag is followed on the window, since reordering moves the handle itself. */
+	function dragMove(event: PointerEvent) {
+		if (!dragging) return;
+		const { list, entry } = dragging;
+		const over = entryAt(list, event.clientX, event.clientY);
+		if (!over || over.id === entry.id) return;
+		const ids = ordered(list).map((item) => item.id);
+		ids.splice(ids.indexOf(over.id), 0, ...ids.splice(ids.indexOf(entry.id), 1));
 		preview = { provider: list.provider, ids };
 	}
-	function drop(event: DragEvent, list: CredentialList) {
-		event.preventDefault();
-		const moved = list.entries.find((entry) => entry.id === dragging);
+	function dragEnd(commit: boolean) {
+		if (!dragging) return;
+		const { list, entry } = dragging;
 		dragging = null;
-		if (!moved || !preview || preview.ids.every((id, index) => list.entries[index].id === id)) preview = null;
-		else reorder(list, preview.ids, moved);
+		if (!commit || !preview || preview.ids.every((id, index) => list.entries[index].id === id)) preview = null;
+		else reorder(list, preview.ids, entry);
 	}
 
 	const toggle = (entry: CredentialEntry) =>
@@ -155,6 +170,7 @@
 </script>
 
 <svelte:head><title>My credentials · Concurro</title></svelte:head>
+<svelte:window onpointermove={dragMove} onpointerup={() => dragEnd(true)} onpointercancel={() => dragEnd(false)} />
 <PageHeader title="My credentials" subtitle="Your provider credentials, in the order Concurro tries them. A task you fund uses the first enabled one that matches the work.">
 	{#snippet actions()}{#if listing}<Button variant="primary" icon={Plus} disabled={busy} onclick={() => openForm(null)}>Add credential</Button>{/if}{/snippet}
 </PageHeader>
@@ -177,22 +193,11 @@
 			<ol class="entries">
 				{#each entries as entry, index (entry.id)}
 					{@const type = typeOf(entry.type)}
-					<li class="entry" class:off={!entry.enabled} class:dragging={dragging === entry.id} ondragover={(event) => dragOver(event, list, entry)} ondrop={(event) => drop(event, list)}>
+					<li class="entry" data-entry={entry.id} class:off={!entry.enabled} class:dragging={dragging?.entry.id === entry.id}>
 						<div class="row">
-							<span
-								class="grip" role="presentation" title="Drag to reorder" draggable={!busy && entries.length > 1}
-								ondragstart={(event) => {
-									dragging = entry.id;
-									event.dataTransfer?.setData('text/plain', entry.name);
-									const row = event.currentTarget.closest('li');
-									if (row && event.dataTransfer) { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setDragImage(row, 12, 12); }
-								}}
-								ondragend={() => { if (dragging) { dragging = null; preview = null; } }}
-							><GripVertical size={14} aria-hidden="true" /></span>
-							<span class="moves">
-								<button type="button" data-move="{entry.id}:-1" aria-label="Move {entry.name} up" disabled={index === 0} onclick={() => move(list, index, -1)}><ChevronUp size={14} aria-hidden="true" /></button>
-								<button type="button" data-move="{entry.id}:1" aria-label="Move {entry.name} down" disabled={index === entries.length - 1} onclick={() => move(list, index, 1)}><ChevronDown size={14} aria-hidden="true" /></button>
-							</span>
+							{#if entries.length > 1}
+								<button type="button" class="grip" aria-label="Reorder {entry.name}: position {index + 1} of {entries.length}" title="Drag to reorder, or press ↑ or ↓" {...handle(list, entry)}><GripVertical size={14} aria-hidden="true" /></button>
+							{/if}
 							<button type="button" class="summary" aria-expanded={!!expanded[entry.id]} aria-controls="details-{entry.id}" onclick={() => (expanded[entry.id] = !expanded[entry.id])}>
 								<span class="chevron"><ChevronRight size={14} aria-hidden="true" /></span>
 								<span class="text">
@@ -283,12 +288,10 @@
 	.entry + .entry { border-top: 1px solid var(--border); }
 	.entry.dragging { opacity: 0.5; }
 	.row { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); }
-	.grip { display: flex; padding: var(--s-1); color: var(--text-3); cursor: grab; }
-	.grip[draggable='false'] { visibility: hidden; }
-	.moves { display: flex; }
-	.moves button, :global(.entry-menu) { display: flex; padding: var(--s-1); border: 0; border-radius: var(--r-sm); background: none; color: var(--text-2); cursor: pointer; }
-	.moves button:hover:not(:disabled), :global(.entry-menu:hover) { background: var(--surface-3); color: var(--text); }
-	.moves button:disabled { color: var(--text-disabled); cursor: default; }
+	.grip, :global(.entry-menu) { display: flex; padding: var(--s-1); border: 0; border-radius: var(--r-sm); background: none; color: var(--text-2); cursor: pointer; }
+	.grip { color: var(--text-3); cursor: grab; touch-action: none; }
+	.grip:hover, :global(.entry-menu:hover) { background: var(--surface-3); color: var(--text); }
+	.entry.dragging .grip { cursor: grabbing; }
 	.summary { display: flex; flex: 1; align-items: center; gap: var(--s-2); min-width: 0; padding: var(--s-1); border: 0; background: none; text-align: left; cursor: pointer; }
 	.chevron { display: flex; color: var(--text-3); transition: transform var(--dur) var(--ease); }
 	.summary[aria-expanded='true'] .chevron { transform: rotate(90deg); }
@@ -301,7 +304,7 @@
 	.switch[aria-checked='true'] { border-color: var(--accent); background: var(--accent); }
 	.switch[aria-checked='true'] span { background: var(--on-accent); transform: translateX(14px); }
 	.switch:disabled { cursor: default; opacity: 0.6; }
-	dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); margin: 0; padding: var(--s-2) var(--s-4) var(--s-3) calc(var(--s-7) + var(--s-6)); font-size: var(--fs-sm); }
+	dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); margin: 0; padding: var(--s-2) var(--s-4) var(--s-3) var(--s-7); font-size: var(--fs-sm); }
 	dl .wide { grid-column: 1 / -1; }
 	dt { font-size: var(--fs-xs); color: var(--text-2); }
 	dd { margin: 0; overflow-wrap: anywhere; }
@@ -311,7 +314,6 @@
 	input, select { padding: var(--s-2); border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text); }
 	@media (max-width: 560px) {
 		.row { gap: var(--s-1); padding-inline: var(--s-2); }
-		.grip { display: none; }
 		dl { padding-left: var(--s-4); }
 	}
 </style>
