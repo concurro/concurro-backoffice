@@ -16,7 +16,7 @@ function entry(type: CredentialTypeId, name: string, rest: Partial<CredentialEnt
 	return {
 		id: `mock-entry-${++seq}`, provider: kind.provider, type, kind: kind.kind, name, enabled: true, roles: [], profiles: [], revision: 1,
 		status: 'valid', statusReason: 'stored', fingerprint: `sha256:mock-${seq}`, version: 1, lastUpdated: ago(3 * H), lastUsed: ago(14),
-		expiresAt: null, expiryKnown: false, accountLabel: kind.accountId ? 'Supplied ChatGPT account (mock)' : null, accountVerified: false, ...rest
+		expiresAt: null, expiryKnown: false, accountLabel: kind.accountId ? 'Supplied ChatGPT account (mock)' : null, accountVerified: false, custody: 'vault', ...rest
 	};
 }
 
@@ -84,6 +84,22 @@ export function add(type: CredentialTypeId, policy: CredentialPolicy, secret: Cr
 	return $state.snapshot(created);
 }
 
+/** Add a synthetic Sponsor entry to each selected subscription list. */
+export function addRelay(code: string, routes: string[], policy: CredentialPolicy): { entries: Record<string, CredentialEntry> } {
+	if (!/^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code)) throw new Refused(422, 'Enter the code shown by Sponsor.');
+	if (!routes.length || routes.some((route) => !['claude-subscription', 'chatgpt-subscription'].includes(route)) || new Set(routes).size !== routes.length)
+		throw new Refused(422, 'Select the routes shown by Sponsor.');
+	const entries: Record<string, CredentialEntry> = {};
+	for (const route of routes) {
+		const type = route === 'claude-subscription' ? 'claude_subscription' : 'chatgpt_subscription';
+		const created = entry(type, policy.name, { ...policy, custody: 'relay', lastUsed: null, accountLabel: null });
+		group(created.provider).entries.push(created);
+		group(created.provider).revision += 1;
+		entries[route] = $state.snapshot(created);
+	}
+	return { entries };
+}
+
 export function edit(id: string, revision: number, changes: Partial<CredentialPolicy & { enabled: boolean }>): CredentialEntry {
 	return changed(current(id, revision), changes);
 }
@@ -93,6 +109,14 @@ export function replace(id: string, revision: number, secret: CredentialSecret):
 	const target = current(id, revision);
 	store(target, secret);
 	return changed(target, { version: (target.version ?? 0) + 1 });
+}
+
+/** Replace one synthetic Sponsor entry after a new approval. */
+export function replaceRelay(id: string, revision: number, code: string): CredentialEntry {
+	const target = current(id, revision);
+	if (target.custody !== 'relay' || !/^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code))
+		throw new Refused(422, 'Enter the code shown by Sponsor.');
+	return changed(target, { status: 'valid', statusReason: 'approved', version: (target.version ?? 0) + 1, lastUpdated: now() });
 }
 
 export function reorder(provider: Provider, revision: number, entries: string[]) {

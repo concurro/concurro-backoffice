@@ -482,6 +482,8 @@ export interface CredentialEntry extends CredentialPolicy {
 	accountLabel?: string | null;
 	/** True only with authenticated evidence. */
 	accountVerified?: boolean;
+	/** Where the active credential stays. */
+	custody?: 'vault' | 'relay';
 }
 
 /** A provider's entries in priority order. */

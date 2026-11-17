@@ -108,10 +108,19 @@ export const actions = {
 	async refreshTarget(_owner: string, _repo: string) {},
 	addCredential: async (type: CredentialTypeId, policy: CredentialPolicy, secret: CredentialSecret) =>
 		write(() => credentials.add(type, policy, secret)),
+	/** Simulate approval in each selected provider list. */
+	addRelay: async (code: string, routes: string[], policy: CredentialPolicy) => {
+		const result = credentials.addRelay(code, routes, policy);
+		for (const route of routes) credentialsChanged(route === 'claude-subscription' ? 'anthropic' : 'openai');
+		return result;
+	},
 	editCredential: async (entry: CredentialEntry, changes: Partial<CredentialPolicy & { enabled: boolean }>) =>
 		write(() => credentials.edit(entry.id, entry.revision, changes)),
 	replaceCredential: async (entry: CredentialEntry, secret: CredentialSecret) =>
 		write(() => credentials.replace(entry.id, entry.revision, secret)),
+	/** Simulate reapproval of one Sponsor entry. */
+	replaceRelay: async (entry: CredentialEntry, code: string) =>
+		write(() => credentials.replaceRelay(entry.id, entry.revision, code)),
 	reorderCredentials: async (list: CredentialList, entries: string[]) =>
 		write(() => credentials.reorder(list.provider, list.revision, entries)),
 	removeCredential: async (entry: CredentialEntry) => write(() => credentials.remove(entry.id, entry.revision)),

@@ -12,7 +12,7 @@ const { js } = compileModule(javascript, { filename: 'credentials.svelte.js', ge
 const output = new URL('../.svelte-kit/credentials-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, js.code);
-const { read, add, edit, replace, reorder, remove } = await import(output.href);
+const { read, add, addRelay, edit, replace, reorder, remove } = await import(output.href);
 const currentEntry = (entries, entry) => entries.find((found) => found.id === entry.id);
 
 const openai = () => read().providers.find((list) => list.provider === 'openai');
@@ -65,4 +65,21 @@ test('a stale reorder is refused and removal ends later writes to the entry', ()
     remove(entry.id, entry.revision);
     assert.equal(currentEntry(openai().entries, entry), undefined);
     assert.throws(() => edit(entry.id, entry.revision, { enabled: true }), refused(410));
+});
+
+test('Sponsor approval adds only selected routes, with both routes in one result', () => {
+    const policy = { name: 'Sponsor', roles: [], profiles: [] };
+    for (const routes of [['claude-subscription'], ['chatgpt-subscription'],
+        ['claude-subscription', 'chatgpt-subscription']]) {
+        const before = read().providers.map((list) => list.entries.length);
+        const result = addRelay('BCDF-GHJK', routes, policy);
+        assert.deepEqual(Object.keys(result.entries), routes);
+        assert.deepEqual(read().providers.map((list) => list.entries.length), [
+            before[0] + Number(routes.includes('claude-subscription')),
+            before[1] + Number(routes.includes('chatgpt-subscription')),
+        ]);
+        assert.ok(Object.values(result.entries).every((entry) => entry.custody === 'relay'));
+    }
+    assert.throws(() => addRelay('BCDF-GHJK', [], policy), refused(422));
+    assert.throws(() => addRelay('BCDF-GHJK', ['claude-subscription', 'claude-subscription'], policy), refused(422));
 });

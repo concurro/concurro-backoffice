@@ -164,11 +164,17 @@ export const actions = {
 	},
 	addCredential: (type: CredentialTypeId, policy: CredentialPolicy, secret: CredentialSecret) =>
 		mutate<CredentialEntry>('POST', '/api/me/credentials', { type, ...policy, ...secret }),
+	/** Approve the Sponsor's exact selected route set. */
+	addRelay: (code: string, routes: string[], policy: CredentialPolicy) =>
+		mutate<{ entries: Record<string, CredentialEntry> }>('POST', '/api/me/credentials/relay', { code, routes, ...policy }),
 	/** Rename, enable or refilter one entry at the revision last read; its token is untouched. */
 	editCredential: (entry: CredentialEntry, changes: Partial<CredentialPolicy & { enabled: boolean }>) =>
 		mutate<CredentialEntry>('PATCH', `/api/me/credentials/${entry.id}`, { revision: entry.revision, ...changes }),
 	replaceCredential: (entry: CredentialEntry, secret: CredentialSecret) =>
 		mutate<CredentialEntry>('PUT', `/api/me/credentials/${entry.id}/secret`, { revision: entry.revision, ...secret }),
+	/** Reapprove a relay entry at the revision last read. */
+	replaceRelay: (entry: CredentialEntry, code: string) =>
+		mutate<CredentialEntry>('PUT', `/api/me/credentials/${entry.id}/relay`, { revision: entry.revision, code }),
 	/** Set one provider's exact priority order at the list revision last read. */
 	reorderCredentials: (list: CredentialList, entries: string[]) =>
 		mutate<CredentialList>('PUT', `/api/me/credentials/order/${list.provider}`, { revision: list.revision, entries }),

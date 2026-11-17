@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
 	import { ChevronRight, Ellipsis, GripVertical, KeyRound, LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-svelte';
-	import { tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import Alert from '#lib/components/Alert.svelte';
 	import Badge from '#lib/components/Badge.svelte';
@@ -32,6 +32,11 @@
 	let busy = $state(false);
 	let announcement = $state('');
 	let expanded = $state<Record<string, boolean>>({});
+	let relayOpen = $state(false);
+	let relayName = $state('My Sponsor');
+	let relayCode = $state('');
+	let relayRoutes = $state('both');
+	onMount(() => { relayOpen = new URLSearchParams(location.search).has('approveRelay'); });
 
 	/** Show a listing that was read, and point open dialogs at its revisions; a dialog whose entry is gone closes. */
 	function show(value: CredentialListing & { targets: Target[] }) {
@@ -137,6 +142,17 @@
 	let secret = $state('');
 	let accountId = $state('');
 	$effect(() => { if (!formOpen && !replaceOpen) { secret = ''; accountId = ''; } });
+	/** Accept Sponsor's displayed device-code shape. */
+	const codeReady = (code: string) => /^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code.trim().toUpperCase());
+	/** Submit the route set selected when Sponsor was started. */
+	async function approveRelay() {
+		const name = relayName.trim();
+		if (!name || !codeReady(relayCode)) return;
+		const routes = relayRoutes === 'both' ? ['claude-subscription', 'chatgpt-subscription'] : [relayRoutes];
+		const label = relayRoutes === 'both' ? 'Claude and ChatGPT' : relayRoutes === 'claude-subscription' ? 'Claude' : 'ChatGPT';
+		if (await write(() => actions.addRelay(relayCode.trim().toUpperCase(), routes, { name, roles: [], profiles: [] }), `${name} approved for ${label}`)) relayOpen = false;
+		relayCode = '';
+	}
 
 	function openForm(entry: CredentialEntry | null) {
 		form = { entry, type: entry?.type ?? listing!.types[0].id, name: entry?.name ?? '', roles: [...(entry?.roles ?? [])], profiles: [...(entry?.profiles ?? [])] };
@@ -158,8 +174,10 @@
 	async function replace() {
 		const entry = replacing;
 		if (!entry) return;
-		if (await write(() => actions.replaceCredential(entry, token(typeOf(entry.type))), `${entry.name} token replaced`)) replaceOpen = false;
+		const relay = entry.custody === 'relay';
+		if (await write(() => relay ? actions.replaceRelay(entry, relayCode.trim().toUpperCase()) : actions.replaceCredential(entry, token(typeOf(entry.type))), `${entry.name} ${relay ? 'approval' : 'token'} replaced`)) replaceOpen = false;
 		secret = ''; accountId = '';
+		relayCode = '';
 	}
 	async function remove() {
 		const entry = removing;
@@ -172,7 +190,7 @@
 <svelte:head><title>My credentials · Concurro</title></svelte:head>
 <svelte:window onpointermove={dragMove} onpointerup={() => dragEnd(true)} onpointercancel={() => dragEnd(false)} />
 <PageHeader title="My credentials" subtitle="Your provider credentials, in the order Concurro tries them. A task you fund uses the first enabled one that matches the work.">
-	{#snippet actions()}{#if listing}<Button variant="primary" icon={Plus} disabled={busy} onclick={() => openForm(null)}>Add credential</Button>{/if}{/snippet}
+	{#snippet actions()}{#if listing}<Button disabled={busy} onclick={() => (relayOpen = true)}>Approve Sponsor</Button><Button variant="primary" icon={Plus} disabled={busy} onclick={() => openForm(null)}>Add credential</Button>{/if}{/snippet}
 </PageHeader>
 
 {#if failure && !listing}<ErrorState error={failure} />
@@ -202,7 +220,7 @@
 								<span class="chevron"><ChevronRight size={14} aria-hidden="true" /></span>
 								<span class="text">
 									<span class="name">{entry.name}</span>
-									<span class="sub">{type.label} · {filterSummary(entry, listing.roles)}</span>
+								<span class="sub">{type.label} · {entry.custody === 'relay' ? 'Sponsor on your machine · ' : ''}{filterSummary(entry, listing.roles)}</span>
 								</span>
 							</button>
 							{#if entry.status !== 'valid'}<Badge meta={credentialMeta[entry.status]} />{/if}
@@ -212,7 +230,7 @@
 								<DropdownMenu.Portal>
 									<DropdownMenu.Content class="user-menu" align="end" sideOffset={4}>
 										<DropdownMenu.Item class="menu-item" onSelect={() => openForm(entry)}><Pencil size={14} aria-hidden="true" /><span>Edit</span></DropdownMenu.Item>
-										<DropdownMenu.Item class="menu-item" onSelect={() => { replacing = entry; replaceOpen = true; }}><KeyRound size={14} aria-hidden="true" /><span>Replace token</span></DropdownMenu.Item>
+										<DropdownMenu.Item class="menu-item" onSelect={() => { replacing = entry; replaceOpen = true; }}><KeyRound size={14} aria-hidden="true" /><span>{entry.custody === 'relay' ? 'Replace Sponsor approval' : 'Replace token'}</span></DropdownMenu.Item>
 										<DropdownMenu.Separator class="menu-sep" />
 										<DropdownMenu.Item class="menu-item" onSelect={() => { removing = entry; removeOpen = true; }}><Trash2 size={14} aria-hidden="true" /><span>Remove</span></DropdownMenu.Item>
 									</DropdownMenu.Content>
@@ -221,7 +239,8 @@
 						</div>
 						{#if expanded[entry.id]}
 							<dl id="details-{entry.id}">
-								<div><dt>Token saved</dt><dd>{entry.lastUpdated ? relTime(entry.lastUpdated) : 'Unknown'}</dd></div>
+								<div><dt>{entry.custody === 'relay' ? 'Approved' : 'Token saved'}</dt><dd>{entry.lastUpdated ? relTime(entry.lastUpdated) : 'Unknown'}</dd></div>
+								<div><dt>Custody</dt><dd>{entry.custody === 'relay' ? 'Sponsor on your machine' : 'Concurro vault'}</dd></div>
 								<div><dt>Last used</dt><dd>{entry.lastUsed ? relTime(entry.lastUsed) : 'Never'}</dd></div>
 								<div><dt>Expires</dt><dd>{entry.expiryKnown && entry.expiresAt ? entry.expiresAt : 'Unknown'}</dd></div>
 								<div><dt>Fingerprint</dt><dd class="mono">{entry.fingerprint ?? '—'}</dd></div>
@@ -242,6 +261,7 @@
 	{:else}
 		<EmptyState icon={KeyRound} title="No credentials yet" text="Add an API key or a subscription token to fund tasks with your own account.">
 			<Button variant="primary" icon={Plus} onclick={() => openForm(null)}>Add credential</Button>
+			<Button onclick={() => (relayOpen = true)}>Approve Sponsor</Button>
 		</EmptyState>
 	{/each}
 {/if}
@@ -269,14 +289,28 @@
 	{#snippet footer()}<Button onclick={() => (formOpen = false)}>Cancel</Button><Button type="submit" form="credential" variant="primary" disabled={busy || !form.name.trim() || (!form.entry && !tokenReady(formType))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : form.entry ? 'Save' : 'Add'}</Button>{/snippet}
 </Modal>
 
-<Modal bind:open={replaceOpen} title="Replace token for {replacing?.name ?? ''}" description="The name, filters and position stay as they are. Tasks already running keep the token they started with.">
-	{#if replacing && listing}
-		<form id="replacement" onsubmit={(event) => { event.preventDefault(); replace(); }}><TokenFields type={typeOf(replacing.type)} bind:secret bind:accountId /></form>
-	{/if}
-	{#snippet footer()}<Button onclick={() => (replaceOpen = false)}>Cancel</Button><Button type="submit" form="replacement" variant="primary" disabled={busy || !replacing || !listing || !tokenReady(typeOf(replacing.type))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : 'Replace token'}</Button>{/snippet}
+<Modal bind:open={relayOpen} title="Approve Sponsor" description="Enter the code and select the routes shown by Sponsor. Combined approval adds both entries together. You can change each entry's filters afterward.">
+	<form id="relay-approval" onsubmit={(event) => { event.preventDefault(); approveRelay(); }}>
+		<label>Code<input required autocomplete="off" maxlength="9" placeholder="BCDF-GHJK" bind:value={relayCode} /></label>
+		<label>Name<input required maxlength="80" autocomplete="off" bind:value={relayName} /></label>
+		<label>Routes<select bind:value={relayRoutes}><option value="claude-subscription">Claude</option><option value="chatgpt-subscription">ChatGPT</option><option value="both">Claude and ChatGPT</option></select></label>
+	</form>
+	{#snippet footer()}<Button onclick={() => (relayOpen = false)}>Cancel</Button><Button type="submit" form="relay-approval" variant="primary" disabled={busy || !relayName.trim() || !codeReady(relayCode)} icon={busy ? LoaderCircle : undefined}>{busy ? 'Approving…' : 'Approve selected routes'}</Button>{/snippet}
 </Modal>
 
-<Modal bind:open={removeOpen} title="Remove {removing?.name ?? ''}?" description="Takes this credential off your list and deletes its stored token from Concurro. Work running on it is stopped; the record of what it paid for is kept. This does not revoke the key or sign the account out at the provider. To keep the token but stop using it, disable the credential instead.">
+<Modal bind:open={replaceOpen} title="Replace {replacing?.custody === 'relay' ? 'Sponsor approval' : 'token'} for {replacing?.name ?? ''}" description="The name, filters and position stay as they are. Tasks already running keep the credential they started with.">
+	{#if replacing && listing}
+		<form id="replacement" onsubmit={(event) => { event.preventDefault(); replace(); }}>
+			{#if replacing.custody === 'relay'}
+				<p>Register Sponsor for this route alone in a separate local state directory, so your other route stays connected. Then enter its new code.</p>
+				<label>New Sponsor code for {typeOf(replacing.type).label}<input required autocomplete="off" maxlength="9" placeholder="BCDF-GHJK" bind:value={relayCode} /></label>
+			{:else}<TokenFields type={typeOf(replacing.type)} bind:secret bind:accountId />{/if}
+		</form>
+	{/if}
+	{#snippet footer()}<Button onclick={() => (replaceOpen = false)}>Cancel</Button><Button type="submit" form="replacement" variant="primary" disabled={busy || !replacing || !listing || (replacing.custody === 'relay' ? !codeReady(relayCode) : !tokenReady(typeOf(replacing.type)))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : replacing?.custody === 'relay' ? 'Replace approval' : 'Replace token'}</Button>{/snippet}
+</Modal>
+
+<Modal bind:open={removeOpen} title="Remove {removing?.name ?? ''}?" description={removing?.custody === 'relay' ? 'Takes this Sponsor entry off your list and retires its approval. Work running on it is stopped; the record of what it paid for is kept. To keep the approval but stop using it, disable the entry instead.' : 'Takes this credential off your list and deletes its stored token from Concurro. Work running on it is stopped; the record of what it paid for is kept. This does not revoke the key or sign the account out at the provider. To keep the token but stop using it, disable the credential instead.'}>
 	{#snippet footer()}<Button onclick={() => (removeOpen = false)}>Cancel</Button><Button variant="danger-solid" disabled={busy} onclick={remove}>Remove credential</Button>{/snippet}
 </Modal>
 
