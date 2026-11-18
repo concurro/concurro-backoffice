@@ -1,4 +1,4 @@
-import type { CredentialEntry, CredentialListing, CredentialPolicy, CredentialSecret, CredentialType, CredentialTypeId, Provider } from '#lib/types.ts';
+import type { CredentialEntry, CredentialListing, CredentialPolicy, CredentialSecret, CredentialType, CredentialTypeId, Provider, RelayLive, RelayOverview, RelayPending } from '#lib/types.ts';
 import { ago, D, H } from './time';
 
 const types: CredentialType[] = [
@@ -26,11 +26,14 @@ const listing: CredentialListing = $state({
 		{ provider: 'anthropic', label: 'Anthropic', revision: 1, entries: [
 			entry('anthropic_api', 'Team API key'),
 			entry('claude_subscription', 'Claude Max', { enabled: false, status: 'expired', statusReason: 'expired', lastUpdated: ago(9 * D), lastUsed: ago(2 * D),
-				profiles: [{ target: 'example-org/ledger-core', profile: 'opus55-high' }, { target: 'example-org/retired-service', profile: 'opus55-high' }] })
+				profiles: [{ target: 'example-org/ledger-core', profile: 'opus55-high' }, { target: 'example-org/retired-service', profile: 'opus55-high' }] }),
+			entry('claude_subscription', 'Studio Sponsor', { custody: 'relay', relay: 'relay-mock-studio', version: 2, fingerprint: 'relay:5f1c09ab', lastUsed: ago(6) }),
+			entry('claude_subscription', 'Laptop Sponsor', { custody: 'relay', relay: 'relay-mock-laptop', version: 3, fingerprint: 'relay:0b7e44d2', lastUsed: ago(2 * D) })
 		] },
 		{ provider: 'openai', label: 'OpenAI', revision: 1, entries: [
 			entry('openai_api', 'Work API key', { roles: ['triage'], lastUpdated: ago(5 * H), lastUsed: ago(5 * H) }),
-			entry('chatgpt_subscription', 'ChatGPT Plus', { lastUsed: null })
+			entry('chatgpt_subscription', 'ChatGPT Plus', { lastUsed: null }),
+			entry('chatgpt_subscription', 'Studio Sponsor', { custody: 'relay', relay: 'relay-mock-studio', version: 2, fingerprint: 'relay:5f1c09ab', roles: ['implementer'], accountLabel: null })
 		] }
 	],
 	types,
@@ -42,6 +45,39 @@ const listing: CredentialListing = $state({
 		{ key: 'pr_reviewers', label: 'PR review' }
 	]
 });
+
+const started = ago(4).replace(/\.\d+Z$/, 'Z');
+/** Synthetic live links by device; a device approved in this tab is not connected until it is listed here. */
+const live: Record<string, Omit<RelayLive, 'relay'>> = {
+	'relay-mock-studio': {
+		idle: 1,
+		lastSeen: now(),
+		// Two sessions of one approval that started in the same second, told apart by link slot.
+		active: [1, 2].map((slot) => ({ slot, entry: listing.providers[0].entries[2].id, route: 'claude-subscription', version: 2, since: started, task: { owner: 'example-org', repo: 'ledger-core', issue: slot === 1 ? 412 : 398 } }))
+	},
+	'relay-mock-laptop': { idle: 0, active: [], lastSeen: ago(2 * H) }
+};
+
+/** Setup and live status as the API reports them; this deployment has no download configured. */
+export function relays(): RelayOverview {
+	const approved = new Set(listing.providers.flatMap((list) => list.entries.map((entry) => entry.relay)));
+	return {
+		setup: { server: 'relay.concurro.example:7443', download: null, command: 'concurro-relay --server relay.concurro.example:7443', login: 'concurro-relay login --server relay.concurro.example:7443' },
+		service: 'available',
+		started: ago(3 * D),
+		checked: now(),
+		relays: Object.entries(live).filter(([relay]) => approved.has(relay)).map(([relay, state]) => ({ relay, ...state }))
+	};
+}
+
+/** Routes a synthetic code registered: a code ending in C registers Claude, G ChatGPT, anything else both. */
+function registered(code: string): string[] {
+	if (!/^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code)) throw new Refused(404, 'unknown or expired code');
+	return code.endsWith('C') ? ['claude-subscription'] : code.endsWith('G') ? ['chatgpt-subscription'] : ['chatgpt-subscription', 'claude-subscription'];
+}
+
+/** What a synthetic code registered, as the lookup API answers. */
+export const pending = (code: string): RelayPending => ({ name: 'studio', routes: registered(code), expires_at: null });
 
 /** The lists as a response carries them: a copy that later writes do not reach. */
 export const read = (): CredentialListing => $state.snapshot(listing);
@@ -92,7 +128,7 @@ export function addRelay(code: string, routes: string[], policy: CredentialPolic
 	const entries: Record<string, CredentialEntry> = {};
 	for (const route of routes) {
 		const type = route === 'claude-subscription' ? 'claude_subscription' : 'chatgpt_subscription';
-		const created = entry(type, policy.name, { ...policy, custody: 'relay', lastUsed: null, accountLabel: null });
+		const created = entry(type, policy.name, { ...policy, custody: 'relay', relay: `relay-mock-${code}`, lastUsed: null, accountLabel: null });
 		group(created.provider).entries.push(created);
 		group(created.provider).revision += 1;
 		entries[route] = $state.snapshot(created);
@@ -111,12 +147,16 @@ export function replace(id: string, revision: number, secret: CredentialSecret):
 	return changed(target, { version: (target.version ?? 0) + 1 });
 }
 
-/** Replace one synthetic Sponsor entry after a new approval. */
-export function replaceRelay(id: string, revision: number, code: string): CredentialEntry {
-	const target = current(id, revision);
-	if (target.custody !== 'relay' || !/^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code))
-		throw new Refused(422, 'Enter the code shown by Sponsor.');
-	return changed(target, { status: 'valid', statusReason: 'approved', version: (target.version ?? 0) + 1, lastUpdated: now() });
+/** Rebind one entry per route the code registered to a new device; names, filters and positions stay. */
+export function replaceDevice(entries: { id: string; revision: number }[], code: string): { entries: Record<string, CredentialEntry> } {
+	const routes = registered(code);
+	const targets = entries.map((item) => current(item.id, item.revision));
+	const route = (target: CredentialEntry) => (target.type === 'claude_subscription' ? 'claude-subscription' : 'chatgpt-subscription');
+	if (targets.map(route).toSorted().join() !== routes.join()) throw new Refused(409, 'relay approval unavailable');
+	const relay = `relay-mock-${++seq}`;
+	return { entries: Object.fromEntries(targets.map((target) => [route(target), changed(target, {
+		custody: 'relay', relay, status: 'valid', statusReason: 'stored', version: (target.version ?? 0) + 1, lastUpdated: now(), fingerprint: `relay:mock-${seq}`
+	})])) };
 }
 
 export function reorder(provider: Provider, revision: number, entries: string[]) {

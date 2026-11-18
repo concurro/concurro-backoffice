@@ -72,19 +72,27 @@ export const api = {
 	credentialListing: fixtures.credentialListing,
 	credentials: fixtures.credentials,
 	sponsorships: fixtures.sponsorships,
+	relays: async () => credentials.relays(),
+	/** Fail as the API does for an unknown code. */
+	pendingRelay: async (code: string) => refusedAsApi(() => credentials.pending(code)),
 	operator: fixtures.operator,
 	index: fixtures.index
 };
 
-/** Apply a synthetic credential write, failing as the API does and waking the tasks it could unblock. */
-function write<T extends { provider: Provider }>(change: () => T): T {
+/** Run a synthetic change, failing as the API does. */
+function refusedAsApi<T>(change: () => T): T {
 	try {
-		const result = change();
-		credentialsChanged(result.provider);
-		return result;
+		return change();
 	} catch (error) {
 		throw error instanceof credentials.Refused ? new ApiError(error.status, error.message) : error;
 	}
+}
+
+/** Apply a synthetic credential write, failing as the API does and waking the tasks it could unblock. */
+function write<T extends { provider: Provider }>(change: () => T): T {
+	const result = refusedAsApi(change);
+	credentialsChanged(result.provider);
+	return result;
 }
 
 /** Fixtures have no stream behind them: changes come from commands applied in the browser. */
@@ -118,9 +126,12 @@ export const actions = {
 		write(() => credentials.edit(entry.id, entry.revision, changes)),
 	replaceCredential: async (entry: CredentialEntry, secret: CredentialSecret) =>
 		write(() => credentials.replace(entry.id, entry.revision, secret)),
-	/** Simulate reapproval of one Sponsor entry. */
-	replaceRelay: async (entry: CredentialEntry, code: string) =>
-		write(() => credentials.replaceRelay(entry.id, entry.revision, code)),
+	/** Simulate one new device approval for a paired device's entries. */
+	replaceDevice: async (entries: CredentialEntry[], code: string) => {
+		const result = refusedAsApi(() => credentials.replaceDevice(entries.map(({ id, revision }) => ({ id, revision })), code));
+		for (const entry of Object.values(result.entries)) credentialsChanged(entry.provider);
+		return result;
+	},
 	reorderCredentials: async (list: CredentialList, entries: string[]) =>
 		write(() => credentials.reorder(list.provider, list.revision, entries)),
 	removeCredential: async (entry: CredentialEntry) => write(() => credentials.remove(entry.id, entry.revision)),

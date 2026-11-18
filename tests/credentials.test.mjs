@@ -12,7 +12,7 @@ const { js } = compileModule(javascript, { filename: 'credentials.svelte.js', ge
 const output = new URL('../.svelte-kit/credentials-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, js.code);
-const { read, add, addRelay, edit, replace, reorder, remove } = await import(output.href);
+const { read, add, addRelay, edit, replace, replaceDevice, pending, relays, reorder, remove } = await import(output.href);
 const currentEntry = (entries, entry) => entries.find((found) => found.id === entry.id);
 
 const openai = () => read().providers.find((list) => list.provider === 'openai');
@@ -21,7 +21,7 @@ const refused = (status) => (error) => error.status === status;
 
 test('entries of one type are added, edited and given a new token independently', () => {
     const first = add('chatgpt_subscription', { name: 'Second account', roles: ['planner'], profiles: [] }, { secret: 'synthetic', account_id: 'synthetic' });
-    assert.deepEqual(names(), ['Work API key', 'ChatGPT Plus', 'Second account']);
+    assert.deepEqual(names(), ['Work API key', 'ChatGPT Plus', 'Studio Sponsor', 'Second account']);
     assert.throws(() => add('chatgpt_subscription', { name: 'No account', roles: [], profiles: [] }, { secret: 'synthetic' }), refused(422));
     const other = JSON.stringify(openai().entries[1]);
     const edited = edit(first.id, first.revision, { enabled: false, name: 'Spare' });
@@ -82,4 +82,32 @@ test('Sponsor approval adds only selected routes, with both routes in one result
     }
     assert.throws(() => addRelay('BCDF-GHJK', [], policy), refused(422));
     assert.throws(() => addRelay('BCDF-GHJK', ['claude-subscription', 'claude-subscription'], policy), refused(422));
+});
+
+test('concurrent sessions of one approval in the same second have distinct lease slots', () => {
+    const studio = relays().relays.find((item) => item.relay === 'relay-mock-studio');
+    assert.equal(new Set(studio.active.map((lease) => `${lease.entry}/${lease.since}`)).size, 1);
+    assert.deepEqual(studio.active.map((lease) => lease.slot), [1, 2]);
+});
+
+test('a looked-up code names its exact routes, and one code replaces a paired device in place', () => {
+    assert.deepEqual(pending('BCDF-GHJK').routes, ['chatgpt-subscription', 'claude-subscription']);
+    assert.deepEqual(pending('BCDF-GHJC').routes, ['claude-subscription']);
+    assert.throws(() => pending('BCDF'), refused(404));
+    const studio = () => read().providers.flatMap((list) => list.entries).filter((entry) => entry.relay === 'relay-mock-studio');
+    const before = studio();
+    const positions = read().providers.map((list) => list.entries.map((entry) => entry.id));
+    // A code registering only Claude cannot replace both entries; a stale revision is refused.
+    assert.throws(() => replaceDevice(before.map(({ id, revision }) => ({ id, revision })), 'BCDF-GHJC'), refused(409));
+    assert.throws(() => replaceDevice(before.map(({ id, revision }) => ({ id, revision: revision - 1 })), 'BCDF-GHJK'), refused(409));
+    const result = replaceDevice(before.map(({ id, revision }) => ({ id, revision })), 'BCDF-GHJK');
+    const after = Object.values(result.entries);
+    assert.equal(new Set(after.map((entry) => entry.relay)).size, 1);
+    assert.notEqual(after[0].relay, 'relay-mock-studio');
+    assert.deepEqual(after.map((entry) => [entry.id, entry.name, entry.roles, entry.enabled]).toSorted(),
+        before.map((entry) => [entry.id, entry.name, entry.roles, entry.enabled]).toSorted());
+    assert.deepEqual(read().providers.map((list) => list.entries.map((entry) => entry.id)), positions);
+    // The new device is approved, not connected: live status lists only devices with links.
+    assert.ok(!relays().relays.some((item) => item.relay === after[0].relay));
+    assert.ok(relays().relays.every((item) => item.relay !== 'relay-mock-studio'));
 });

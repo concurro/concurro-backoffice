@@ -137,7 +137,7 @@ export interface Sponsorship {
     observations_status?: 'available' | 'unknown';
     /** Native log availability does not imply complete provider usage. */
     native_status?: 'available' | 'unavailable' | 'disabled' | 'unknown';
-    observations?: { request: string; source?: string; completed?: boolean; category: string | null; usage: { input_tokens: number; output_tokens: number } | null; binding: { sponsorship_provider: Provider; sponsor: string; credential_version: number } }[];
+    observations?: { request: string; source?: string; completed?: boolean; category: string | null; usage: { input_tokens: number; output_tokens: number } | null; binding: { sponsorship_provider: Provider; sponsor: string; credential_version: number; route?: string } }[];
     status: string;
     task_status?: string | null;
     slots: Partial<Record<Provider, SponsorSlot>>;
@@ -484,6 +484,8 @@ export interface CredentialEntry extends CredentialPolicy {
 	accountVerified?: boolean;
 	/** Where the active credential stays. */
 	custody?: 'vault' | 'relay';
+	/** Sponsor device the current version is approved for; shared by that device's entries. */
+	relay?: string | null;
 }
 
 /** A provider's entries in priority order. */
@@ -511,6 +513,59 @@ export interface CredentialListing {
 	types: CredentialType[];
 	/** Role filter keys with their display labels, in workflow order. */
 	roles: { key: string; label: string }[];
+}
+
+/** Where Sponsor is obtained and which address it connects to, as this deployment configures them. */
+export interface RelaySetup {
+	/** Public `host:port` for `concurro-relay --server`; null when not configured. */
+	server: string | null;
+	/** Sponsor download page; null when no download is configured. */
+	download: string | null;
+	/** Shell-quoted launch command for `server`; null without one. */
+	command: string | null;
+	/** Shell-quoted command that registers a device again; null without `server`. */
+	login: string | null;
+}
+
+/** One task turn holding one of a device's links. */
+export interface RelayLease {
+	/** Link slot; distinct among one device's leases. */
+	slot: number;
+	/** Entry the lease's approval belongs to. */
+	entry: string;
+	route: string;
+	version: number;
+	since: string;
+	task: IssueRef | null;
+}
+
+/** A device's live links as the hosted verifier last saw them. */
+export interface RelayLive {
+	relay: string;
+	/** Idle authenticated links; shared by every route of the device. */
+	idle: number;
+	active: RelayLease[];
+	/** Now while a link is live; when the last one ended otherwise; null if unseen since `started`. */
+	lastSeen: string | null;
+}
+
+/** `GET /api/me/relays`: setup and live link telemetry; `relays` lists only devices the verifier reported. */
+export interface RelayOverview {
+	setup: RelaySetup;
+	/** `unavailable` and `unconfigured` leave every device's connection unknown. */
+	service: 'available' | 'unavailable' | 'unconfigured';
+	/** Verifier start; telemetry before it is unknown. */
+	started?: string | null;
+	checked?: string | null;
+	relays: RelayLive[];
+}
+
+/** What a displayed Sponsor code registered, before approval. */
+export interface RelayPending {
+	name: string;
+	/** Exact Vault routes the approval binds. */
+	routes: string[];
+	expires_at?: string | null;
 }
 
 export interface UsageRow {

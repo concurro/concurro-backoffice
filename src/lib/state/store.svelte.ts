@@ -32,11 +32,14 @@ for (const task of tasks) {
         task.sponsorships.charged_calls = [
             { id: 'mock-openai-' + task.issue, kind: 'contributed', provider: 'openai', sponsor: String(MOCK_ACTOR_ID), route: 'openai-api-key', version: 1, calls: Math.max(0, total - 2) },
             { id: 'mock-old-' + task.issue, kind: 'contributed', provider: 'openai', sponsor: '99', route: 'openai-api-key', version: 1, calls: Math.min(1, total) },
-            { id: 'mock-anthropic-' + task.issue, kind: 'contributed', provider: 'anthropic', sponsor: '84', route: 'anthropic-api-key', version: 1, calls: Math.min(1, Math.max(0, total - 1)) }
+            { id: 'mock-anthropic-' + task.issue, kind: 'contributed', provider: 'anthropic', sponsor: '84', route: 'anthropic-api-key', version: 1, calls: Math.min(1, Math.max(0, total - 1)) },
+            { id: 'mock-relay-' + task.issue, kind: 'contributed', provider: 'openai', sponsor: String(MOCK_ACTOR_ID), route: 'chatgpt-subscription', version: 2, calls: 2 }
         ];
         task.sponsorships.observations = [
             { request: 'synthetic-native', source: 'native', completed: false, category: null, usage: null, binding: { sponsorship_provider: 'openai', sponsor: String(MOCK_ACTOR_ID), credential_version: 1 } },
-            { request: 'synthetic-provider', source: 'provider', completed: true, category: null, usage: { input_tokens: 2, output_tokens: 3 }, binding: { sponsorship_provider: 'anthropic', sponsor: '84', credential_version: 1 } }
+            { request: 'synthetic-provider', source: 'provider', completed: true, category: null, usage: { input_tokens: 2, output_tokens: 3 }, binding: { sponsorship_provider: 'anthropic', sponsor: '84', credential_version: 1 } },
+            { request: 'synthetic-relay-1', source: 'provider', completed: true, category: null, usage: { input_tokens: 1840, output_tokens: 312 }, binding: { sponsorship_provider: 'openai', sponsor: String(MOCK_ACTOR_ID), credential_version: 2, route: 'chatgpt-subscription' } },
+            { request: 'synthetic-relay-2', source: 'provider', completed: false, category: 'rate_limited', usage: null, binding: { sponsorship_provider: 'openai', sponsor: String(MOCK_ACTOR_ID), credential_version: 2, route: 'chatgpt-subscription' } }
         ];
         task.stage = task.paused;
         task.alert = { tone: 'caution', title: 'Awaiting credentials', body: task.sponsorships.recovery.eligible ? 'Every matching credential failed. Add, enable, reorder or replace a credential and the paused call is selected again after consent, authority and budget are checked. There is no organization fallback.' : 'This pause requires writer action. There is no organization fallback.' };

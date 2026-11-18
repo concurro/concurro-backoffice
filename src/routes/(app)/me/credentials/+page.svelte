@@ -11,15 +11,19 @@
 	import Modal from '#lib/components/Modal.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
+	import RelayCode from '#lib/components/credentials/RelayCode.svelte';
+	import SponsorDevices from '#lib/components/credentials/SponsorDevices.svelte';
+	import SponsorSetup from '#lib/components/credentials/SponsorSetup.svelte';
 	import TokenFields from '#lib/components/credentials/TokenFields.svelte';
 	import UseFor from '#lib/components/credentials/UseFor.svelte';
-	import { actions, ApiError, MOCK, session } from '#lib/api/index.ts';
+	import { actions, api, ApiError, MOCK, session } from '#lib/api/index.ts';
 	import { currentEntry, filterSummary, profileOptions } from '#lib/credentials.ts';
+	import { entryRoute, relayDevices, replacement, routeList, type RelayDevice } from '#lib/relays.ts';
 	import { relTime, taskHref } from '#lib/format.ts';
 	import { credentialMeta } from '#lib/meta.ts';
 	import { needsYou } from '#lib/needs-you.ts';
 	import { toast } from '#lib/state/toast.svelte.ts';
-	import type { CredentialEntry, CredentialList, CredentialListing, CredentialType, CredentialTypeId, ProfileFilter, Target } from '#lib/types.ts';
+	import type { CredentialEntry, CredentialList, CredentialListing, CredentialType, CredentialTypeId, ProfileFilter, RelayOverview, RelayPending, Target } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -33,10 +37,27 @@
 	let announcement = $state('');
 	let expanded = $state<Record<string, boolean>>({});
 	let relayOpen = $state(false);
-	let relayName = $state('My Sponsor');
+	let relayName = $state('');
 	let relayCode = $state('');
-	let relayRoutes = $state('both');
-	onMount(() => { relayOpen = new URLSearchParams(location.search).has('approveRelay'); });
+	let relayFound = $state<RelayPending | null>(null);
+	let setupOpen = $state(false);
+	/** Live Sponsor status; a failed read leaves connections unknown rather than offline. */
+	let overview = $state<RelayOverview | null>(null);
+	let setupKnown = $state(false);
+	async function readRelays() {
+		try {
+			overview = await api.relays();
+			setupKnown = true;
+		} catch {
+			overview = { setup: overview?.setup ?? { server: null, download: null, command: null, login: null }, service: 'unavailable', relays: [] };
+		}
+	}
+	onMount(() => {
+		relayOpen = new URLSearchParams(location.search).has('approveRelay');
+		readRelays();
+		const timer = setInterval(readRelays, 30_000);
+		return () => clearInterval(timer);
+	});
 
 	/** Show a listing that was read, and point open dialogs at its revisions; a dialog whose entry is gone closes. */
 	function show(value: CredentialListing & { targets: Target[] }) {
@@ -52,12 +73,15 @@
 		if (formOpen) form.entry = current(form.entry, () => (formOpen = false));
 		if (replaceOpen) replacing = current(replacing, () => (replaceOpen = false));
 		if (removeOpen) removing = current(removing, () => (removeOpen = false));
+		// A replaced device has a new relay ID; its dialog simply closes.
+		if (deviceOpen && !relayDevices(value).some((device) => device.relay === deviceRelay)) deviceOpen = false;
 	}
 	$effect(() => {
 		data.result.then(show, (error) => { failure = error; });
 	});
 
 	const paused = $derived(needsYou(session.tasks).filter((item) => item.kind === 'credentials'));
+	const devices = $derived(listing ? relayDevices(listing) : []);
 	const typeOf = (id: CredentialTypeId) => listing!.types.find((type) => type.id === id)!;
 	const ordered = (list: CredentialList) =>
 		preview?.provider === list.provider ? preview.ids.flatMap((id) => list.entries.find((entry) => entry.id === id) ?? []) : list.entries;
@@ -78,6 +102,7 @@
 		} finally {
 			// The next write is allowed only once the lists it will name have been read.
 			await invalidateAll().then(() => data.result).then(show, () => {});
+			readRelays();
 			busy = false;
 		}
 	}
@@ -142,16 +167,40 @@
 	let secret = $state('');
 	let accountId = $state('');
 	$effect(() => { if (!formOpen && !replaceOpen) { secret = ''; accountId = ''; } });
-	/** Accept Sponsor's displayed device-code shape. */
-	const codeReady = (code: string) => /^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/.test(code.trim().toUpperCase());
-	/** Submit the route set selected when Sponsor was started. */
+	/** Approve exactly the routes the looked-up code registered. */
 	async function approveRelay() {
-		const name = relayName.trim();
-		if (!name || !codeReady(relayCode)) return;
-		const routes = relayRoutes === 'both' ? ['claude-subscription', 'chatgpt-subscription'] : [relayRoutes];
-		const label = relayRoutes === 'both' ? 'Claude and ChatGPT' : relayRoutes === 'claude-subscription' ? 'Claude' : 'ChatGPT';
-		if (await write(() => actions.addRelay(relayCode.trim().toUpperCase(), routes, { name, roles: [], profiles: [] }), `${name} approved for ${label}`)) relayOpen = false;
+		const found = relayFound;
+		const name = relayName.trim() || found?.name.trim();
+		if (!found || !name) return;
+		const label = routeList(found.routes);
+		if (await write(() => actions.addRelay(relayCode.trim().toUpperCase(), found.routes, { name, roles: [], profiles: [] }), `${name} approved for ${label}`)) relayOpen = false;
 		relayCode = '';
+		relayName = '';
+	}
+
+	/** Device replacement: one new code rebinds the device's entries for the routes it registered. */
+	let deviceOpen = $state(false);
+	let deviceRelay = $state('');
+	let deviceCode = $state('');
+	let deviceFound = $state<RelayPending | null>(null);
+	const replacingDevice = $derived(devices.find((device) => device.relay === deviceRelay));
+	const plan = $derived(replacingDevice && deviceFound ? replacement(replacingDevice, deviceFound.routes) : null);
+	function openDevice(device: RelayDevice) {
+		deviceRelay = device.relay;
+		deviceCode = '';
+		deviceOpen = true;
+	}
+	async function replaceDevice() {
+		const device = replacingDevice;
+		if (!device || !plan || plan.missing.length || !plan.entries.length) return;
+		if (await write(() => actions.replaceDevice(plan.entries, deviceCode.trim().toUpperCase()), `${device.name} replaced`)) deviceOpen = false;
+		deviceCode = '';
+	}
+	/** A code registering routes this device lacks is approved as a new device instead. */
+	function approveAsNew() {
+		relayCode = deviceCode;
+		deviceOpen = false;
+		relayOpen = true;
 	}
 
 	function openForm(entry: CredentialEntry | null) {
@@ -174,10 +223,14 @@
 	async function replace() {
 		const entry = replacing;
 		if (!entry) return;
-		const relay = entry.custody === 'relay';
-		if (await write(() => relay ? actions.replaceRelay(entry, relayCode.trim().toUpperCase()) : actions.replaceCredential(entry, token(typeOf(entry.type))), `${entry.name} ${relay ? 'approval' : 'token'} replaced`)) replaceOpen = false;
+		if (await write(() => actions.replaceCredential(entry, token(typeOf(entry.type))), `${entry.name} token replaced`)) replaceOpen = false;
 		secret = ''; accountId = '';
-		relayCode = '';
+	}
+	/** Relay entries are replaced with their device; token entries get a new token. */
+	function openReplace(entry: CredentialEntry) {
+		const device = devices.find((item) => item.relay === entry.relay);
+		if (entry.custody === 'relay' && device) openDevice(device);
+		else { replacing = entry; replaceOpen = true; }
 	}
 	async function remove() {
 		const entry = removing;
@@ -204,6 +257,7 @@
 		</div>
 	{/if}
 	<p class="sr-only" role="status" aria-live="polite">{announcement}</p>
+	<SponsorDevices {devices} {overview} {busy} onsetup={() => (setupOpen = true)} onreplace={openDevice} />
 	{#each listing.providers.filter((list) => list.entries.length) as list (list.provider)}
 		{@const entries = ordered(list)}
 		<section aria-labelledby="list-{list.provider}">
@@ -230,7 +284,7 @@
 								<DropdownMenu.Portal>
 									<DropdownMenu.Content class="user-menu" align="end" sideOffset={4}>
 										<DropdownMenu.Item class="menu-item" onSelect={() => openForm(entry)}><Pencil size={14} aria-hidden="true" /><span>Edit</span></DropdownMenu.Item>
-										<DropdownMenu.Item class="menu-item" onSelect={() => { replacing = entry; replaceOpen = true; }}><KeyRound size={14} aria-hidden="true" /><span>{entry.custody === 'relay' ? 'Replace Sponsor approval' : 'Replace token'}</span></DropdownMenu.Item>
+										<DropdownMenu.Item class="menu-item" onSelect={() => openReplace(entry)}><KeyRound size={14} aria-hidden="true" /><span>{entry.custody === 'relay' ? 'Replace Sponsor device' : 'Replace token'}</span></DropdownMenu.Item>
 										<DropdownMenu.Separator class="menu-sep" />
 										<DropdownMenu.Item class="menu-item" onSelect={() => { removing = entry; removeOpen = true; }}><Trash2 size={14} aria-hidden="true" /><span>Remove</span></DropdownMenu.Item>
 									</DropdownMenu.Content>
@@ -289,25 +343,38 @@
 	{#snippet footer()}<Button onclick={() => (formOpen = false)}>Cancel</Button><Button type="submit" form="credential" variant="primary" disabled={busy || !form.name.trim() || (!form.entry && !tokenReady(formType))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : form.entry ? 'Save' : 'Add'}</Button>{/snippet}
 </Modal>
 
-<Modal bind:open={relayOpen} title="Approve Sponsor" description="Enter the code and select the routes shown by Sponsor. Combined approval adds both entries together. You can change each entry's filters afterward.">
+<SponsorSetup bind:open={setupOpen} setup={setupKnown && overview ? overview.setup : null} onapprove={() => { setupOpen = false; relayOpen = true; }} />
+
+<Modal bind:open={relayOpen} title="Approve Sponsor" description="Enter the code Sponsor shows. Each route it registered becomes an entry; you can change filters afterward.">
 	<form id="relay-approval" onsubmit={(event) => { event.preventDefault(); approveRelay(); }}>
-		<label>Code<input required autocomplete="off" maxlength="9" placeholder="BCDF-GHJK" bind:value={relayCode} /></label>
-		<label>Name<input required maxlength="80" autocomplete="off" bind:value={relayName} /></label>
-		<label>Routes<select bind:value={relayRoutes}><option value="claude-subscription">Claude</option><option value="chatgpt-subscription">ChatGPT</option><option value="both">Claude and ChatGPT</option></select></label>
+		<RelayCode bind:code={relayCode} bind:found={relayFound} />
+		<label>Name<input maxlength="80" autocomplete="off" placeholder={relayFound?.name ?? 'My Sponsor'} bind:value={relayName} /></label>
 	</form>
-	{#snippet footer()}<Button onclick={() => (relayOpen = false)}>Cancel</Button><Button type="submit" form="relay-approval" variant="primary" disabled={busy || !relayName.trim() || !codeReady(relayCode)} icon={busy ? LoaderCircle : undefined}>{busy ? 'Approving…' : 'Approve selected routes'}</Button>{/snippet}
+	{#snippet footer()}<Button onclick={() => (relayOpen = false)}>Cancel</Button><Button type="submit" form="relay-approval" variant="primary" disabled={busy || !relayFound || !(relayName.trim() || relayFound.name.trim())} icon={busy ? LoaderCircle : undefined}>{busy ? 'Approving…' : relayFound ? `Approve ${routeList(relayFound.routes)}` : 'Approve'}</Button>{/snippet}
 </Modal>
 
-<Modal bind:open={replaceOpen} title="Replace {replacing?.custody === 'relay' ? 'Sponsor approval' : 'token'} for {replacing?.name ?? ''}" description="The name, filters and position stay as they are. Tasks already running keep the credential they started with.">
-	{#if replacing && listing}
-		<form id="replacement" onsubmit={(event) => { event.preventDefault(); replace(); }}>
-			{#if replacing.custody === 'relay'}
-				<p>Register Sponsor for this route alone in a separate local state directory, so your other route stays connected. Then enter its new code.</p>
-				<label>New Sponsor code for {typeOf(replacing.type).label}<input required autocomplete="off" maxlength="9" placeholder="BCDF-GHJK" bind:value={relayCode} /></label>
-			{:else}<TokenFields type={typeOf(replacing.type)} bind:secret bind:accountId />{/if}
+<Modal bind:open={deviceOpen} title="Replace {replacingDevice?.name ?? 'device'}" description="For a new key, such as after reinstalling Sponsor. Names, filters and order stay. Running tasks keep their current approval.">
+	{#if replacingDevice}
+		<form id="device-replacement" onsubmit={(event) => { event.preventDefault(); replaceDevice(); }}>
+			<p>On the device, run {#if overview?.setup.login}<code>{overview.setup.login}</code>{:else}<code>concurro-relay login</code> with this Concurro's Sponsor address{/if}. It keeps your provider sign-ins and shows a new code.</p>
+			<RelayCode bind:code={deviceCode} bind:found={deviceFound} label="New code" />
+			{#if plan?.missing.length}
+				<Alert tone="warning" title="Different routes">This code also registers {routeList(plan.missing)}, which this device has no approval for. <button type="button" class="link" onclick={approveAsNew}>Approve it as a new device</button> instead.</Alert>
+			{:else if plan}
+				<p>Replaces {routeList(plan.entries.map((entry) => entryRoute(entry) ?? ''))}.{#if plan.kept.length} {routeList(plan.kept.map((entry) => entryRoute(entry) ?? ''))} keeps the current approval.{/if}</p>
+			{/if}
 		</form>
 	{/if}
-	{#snippet footer()}<Button onclick={() => (replaceOpen = false)}>Cancel</Button><Button type="submit" form="replacement" variant="primary" disabled={busy || !replacing || !listing || (replacing.custody === 'relay' ? !codeReady(relayCode) : !tokenReady(typeOf(replacing.type)))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : replacing?.custody === 'relay' ? 'Replace approval' : 'Replace token'}</Button>{/snippet}
+	{#snippet footer()}<Button onclick={() => (deviceOpen = false)}>Cancel</Button><Button type="submit" form="device-replacement" variant="primary" disabled={busy || !plan || !!plan.missing.length || !plan.entries.length} icon={busy ? LoaderCircle : undefined}>{busy ? 'Replacing…' : 'Replace'}</Button>{/snippet}
+</Modal>
+
+<Modal bind:open={replaceOpen} title="Replace token for {replacing?.name ?? ''}" description="The name, filters and position stay as they are. Tasks already running keep the credential they started with.">
+	{#if replacing && listing}
+		<form id="replacement" onsubmit={(event) => { event.preventDefault(); replace(); }}>
+			<TokenFields type={typeOf(replacing.type)} bind:secret bind:accountId />
+		</form>
+	{/if}
+	{#snippet footer()}<Button onclick={() => (replaceOpen = false)}>Cancel</Button><Button type="submit" form="replacement" variant="primary" disabled={busy || !replacing || !listing || !tokenReady(typeOf(replacing.type))} icon={busy ? LoaderCircle : undefined}>{busy ? 'Saving…' : 'Replace token'}</Button>{/snippet}
 </Modal>
 
 <Modal bind:open={removeOpen} title="Remove {removing?.name ?? ''}?" description={removing?.custody === 'relay' ? 'Takes this Sponsor entry off your list and retires its approval. Work running on it is stopped; the record of what it paid for is kept. To keep the approval but stop using it, disable the entry instead.' : 'Takes this credential off your list and deletes its stored token from Concurro. Work running on it is stopped; the record of what it paid for is kept. This does not revoke the key or sign the account out at the provider. To keep the token but stop using it, disable the credential instead.'}>
@@ -346,6 +413,9 @@
 	form > label, .fixed { display: grid; gap: var(--s-2); margin: 0; font-size: var(--fs-sm); }
 	.fixed span { font-size: var(--fs-xs); color: var(--text-2); }
 	input, select { padding: var(--s-2); border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text); }
+	form p { margin: 0; font-size: var(--fs-sm); color: var(--text-2); }
+	code { font-family: var(--font-mono); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+	.link { padding: 0; border: 0; background: none; color: var(--accent-text); text-decoration: underline; cursor: pointer; font: inherit; }
 	@media (max-width: 560px) {
 		.row { gap: var(--s-1); padding-inline: var(--s-2); }
 		dl { padding-left: var(--s-4); }

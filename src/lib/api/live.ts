@@ -1,6 +1,6 @@
 import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { Command, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
+import type { Command, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, RelayOverview, RelayPending, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
@@ -136,6 +136,10 @@ export const api = {
 		return { ...result, targets: overview.targets };
 	},
 	sponsorships: () => request<IssueIntent[]>('GET', '/api/me/sponsorships'),
+	/** Sponsor setup and live link telemetry; never cached, since connections change. */
+	relays: () => request<RelayOverview>('GET', '/api/me/relays'),
+	/** The device name and exact routes a displayed Sponsor code registered. */
+	pendingRelay: (code: string) => request<RelayPending>('POST', '/api/me/credentials/relay/pending', { code }),
 	logoutStatus: () => request<{ remote: string }>('GET', '/auth/logout-status'),
 	operator: async (): Promise<never> => {
 		throw new ApiError(501, 'Operator views are not available yet.');
@@ -172,9 +176,9 @@ export const actions = {
 		mutate<CredentialEntry>('PATCH', `/api/me/credentials/${entry.id}`, { revision: entry.revision, ...changes }),
 	replaceCredential: (entry: CredentialEntry, secret: CredentialSecret) =>
 		mutate<CredentialEntry>('PUT', `/api/me/credentials/${entry.id}/secret`, { revision: entry.revision, ...secret }),
-	/** Reapprove a relay entry at the revision last read. */
-	replaceRelay: (entry: CredentialEntry, code: string) =>
-		mutate<CredentialEntry>('PUT', `/api/me/credentials/${entry.id}/relay`, { revision: entry.revision, code }),
+	/** Replace a paired device's approvals, one entry per route the new code registered. */
+	replaceDevice: (entries: CredentialEntry[], code: string) =>
+		mutate<{ entries: Record<string, CredentialEntry> }>('PUT', '/api/me/credentials/relay/device', { code, entries: entries.map((entry) => ({ id: entry.id, revision: entry.revision })) }),
 	/** Set one provider's exact priority order at the list revision last read. */
 	reorderCredentials: (list: CredentialList, entries: string[]) =>
 		mutate<CredentialList>('PUT', `/api/me/credentials/order/${list.provider}`, { revision: list.revision, entries }),
