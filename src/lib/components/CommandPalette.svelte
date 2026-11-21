@@ -2,9 +2,9 @@
 	import { Command, Dialog } from 'bits-ui';
 	import { CircleDot, CornerDownLeft, HandCoins, KeyRound, LayoutDashboard, Palette, Search, ServerCog, Target } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import { targetHref, taskHref } from '#lib/format.ts';
+	import { issueHref, targetHref, taskHref } from '#lib/format.ts';
 	import { taskStageMeta } from '#lib/meta.ts';
-	import { api } from '#lib/api/index.ts';
+	import { api, session } from '#lib/api/index.ts';
 	import { withBase } from '#lib/paths.ts';
 	import { ui } from '#lib/state/ui.svelte.ts';
 
@@ -16,6 +16,9 @@
 		{ href: withBase('/styleguide'), label: 'Styleguide', icon: Palette }
 	];
 	const index = $derived(ui.paletteOpen ? api.index() : { targets: [], tasks: [] });
+	const issues = $derived(ui.paletteOpen ? session.issues.filter((issue) =>
+		!index.tasks.some((task) => task.owner === issue.owner && task.repo === issue.repo && task.issue === issue.issue)
+	) : []);
 
 	/** Every search term must appear in the item's value or keywords. */
 	function filter(value: string, search: string, keywords: string[] = []): number {
@@ -62,6 +65,18 @@
 										<span class="palette-ref">{task.repo}#{task.issue}</span>
 										<span class="palette-title">{task.title}</span>
 										<span class="palette-meta">{meta.label}</span>
+									</Command.Item>
+								{/each}
+							</Command.GroupItems>
+						</Command.Group>
+						<Command.Group>
+							<Command.GroupHeading class="palette-heading">Issues</Command.GroupHeading>
+							<Command.GroupItems>
+								{#each issues as issue (issueHref(issue))}
+									<Command.Item class="palette-item" value={issueHref(issue)} keywords={[`#${issue.issue}`, String(issue.issue), issue.title, issue.owner, issue.repo]} onSelect={() => go(issueHref(issue))}>
+										<CircleDot size={14} aria-hidden="true" />
+										<span class="palette-ref">{issue.repo}#{issue.issue}</span>
+										<span class="palette-title">{issue.title}</span>
 									</Command.Item>
 								{/each}
 							</Command.GroupItems>

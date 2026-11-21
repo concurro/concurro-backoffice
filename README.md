@@ -85,7 +85,7 @@ shows pre-enrollment provider consent; `example-org/ledger-core#398` waits for p
 merged before handoff. An unknown
 issue number, e.g. `/tasks/example-org/ledger-core/1`, shows the error state.
 
-`⌘K` opens the command palette. The user menu holds the theme toggle (light, dark, system).
+`⌘K` opens the command palette, including loaded issues that have not become tasks. The user menu holds the theme toggle (light, dark, system).
 
 The Runner tab loads the selected turn's real Actions run attempts and jobs from the backoffice
 API at `/turns/{turn-id}/runs`. Run details remain unavailable if that endpoint is absent. Historical
