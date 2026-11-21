@@ -18,7 +18,7 @@
 	import TaskSignals from '#lib/components/TaskSignals.svelte';
 	import { duration, relTime, taskHref } from '#lib/format.ts';
 	import { withBase } from '#lib/paths.ts';
-	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
+	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta, pullStateMeta } from '#lib/meta.ts';
 	import { api, profile, session } from '#lib/api/index.ts';
 	import type { ActionsRun, ReviewSummary, Stage, Task, TargetView, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
@@ -64,7 +64,7 @@
     {@const current = configuration?.value}
     {@const target = { ...view.target, ...current }}
 	{@const prs = tasks.filter((t) => t.pr)}
-	{@const retainedPulls = (view.indexedPulls ?? []).filter((pull) => !prs.some((task) => task.pr?.number === pull.number))}
+	{@const retainedPulls = (view.indexedPulls ?? []).filter((pull) => !prs.some((task) => task.pr?.number === pull.number) && !reviews.some((review) => review.pr === pull.number))}
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<SavedData resource={data.resource} label="list" />
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
@@ -161,11 +161,24 @@
 			</Panel>
             {/if}
             {#if retainedPulls.length}
-                <Panel title="Retained pull requests" meta={String(retainedPulls.length)}>
-                    <ul>{#each retainedPulls as pull (pull.number)}<li>
-                        <a href={`https://github.com/${target.owner}/${target.repo}/pull/${pull.number}`}>#{pull.number} · {pull.title}</a>
-                        <Badge plain tone="neutral">{pull.state}</Badge>
-                    </li>{/each}</ul>
+                <Panel flush title="Retained pull requests" meta={String(retainedPulls.length)}>
+                    <DataTable label="Retained pull requests">
+                        <thead><tr><th class="r">#</th><th>Pull request</th><th>Head</th><th>State</th><th class="r">Updated</th></tr></thead>
+                        <tbody>
+                            {#each retainedPulls as pull (pull.number)}
+                                <tr>
+                                    <td class="r mono muted">{pull.number}</td>
+                                    <td class="title">
+                                        <a href={`https://github.com/${target.owner}/${target.repo}/pull/${pull.number}`}><Inline text={pull.title} /></a>
+                                        {#if pull.branch}<p class="sub mono">{pull.branch}{#if pull.baseBranch} → {pull.baseBranch}{/if}</p>{/if}
+                                    </td>
+                                    <td class="mono nowrap">{#if pull.headSha}<span title={pull.headSha}>{pull.headSha.slice(0, 7)}</span>{:else}<span class="muted">—</span>{/if}</td>
+                                    <td class="nowrap">{#if ['open', 'closed', 'merged'].includes(pull.state)}<Badge plain meta={pullStateMeta({ open: pull.state === 'open', draft: pull.draft, merged: pull.state === 'merged' })} />{:else}<Badge plain tone="neutral">Unknown</Badge>{/if}</td>
+                                    <td class="r nowrap muted">{relTime(pull.updatedAt)}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </DataTable>
                 </Panel>
             {/if}
 		{:else if tab === 'runs' && !runsData?.value}

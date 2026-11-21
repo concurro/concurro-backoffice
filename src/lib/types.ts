@@ -151,6 +151,8 @@ export interface Sponsorship {
 
 /** A visible issue intent with no invented stage, budget or enrollment state. */
 export interface IssueIntent extends IssueRef {
+    /** GitHub issue state, when present in the retained index. */
+    state?: string;
     title: string;
     author: string;
     labels: string[];
@@ -761,10 +763,26 @@ export interface Overview {
 	cache?: ReadFreshness;
 }
 
-/** `GET /api/targets/{owner}/{repo}`. */
+/** GitHub PR metadata retained independently of a current Concurro task. */
+export interface IndexedPullRequest {
+	/** Upstream PR identity and title. */
+	number: number;
+	title: string;
+	/** GitHub state; absent evidence stays unknown. */
+	state: string;
+	draft: boolean;
+	/** Retained source and destination branch names and full head commit. */
+	branch: string;
+	baseBranch: string;
+	headSha: string;
+	/** GitHub's last update time, or the index source time. */
+	updatedAt: string;
+}
+
+/** Target tasks and GitHub index rows from the Rust read API. */
 export interface TargetView {
 	/** Retained PRs, including work completed before the current controller. */
-	indexedPulls?: { number: number; title: string; state: string }[];
+	indexedPulls?: IndexedPullRequest[];
 	reviews: ReviewSummary[];
 	issues: IssueIntent[];
 	target: Target;

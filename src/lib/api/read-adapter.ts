@@ -1,4 +1,4 @@
-import type { ActionsRun, Budget, Finding, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, TargetConfiguration, Task, TimelineEvent, Turn } from '#lib/types.ts';
+import type { ActionsRun, Budget, Finding, IndexedPullRequest, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, TargetConfiguration, Task, TimelineEvent, Turn } from '#lib/types.ts';
 import type { ReadIndexRow, ReadTarget, ReadTargetConfiguration, ReadTask, ReadTaskDetail } from './read-model.ts';
 
 /** Treat missing or malformed optional source fields as absent. */
@@ -113,14 +113,28 @@ export function targetConfigurationFromRead(source: ReadTargetConfiguration): Ta
 
 /** Convert one durable issue-list row into the unenrolled issue view. */
 export function issueFromIndex(source: ReadIndexRow, repository: string): IssueIntent {
-	const document = object(source.document);
+	const document = object(source.document.document ?? source.document);
 	const [owner, repo] = repository.split('/');
 	const labels = Array.isArray(document.labels) ? document.labels.map((item) =>
 		string(typeof item === 'string' ? item : object(item).name)).filter(Boolean) : [];
 	return {
-		owner, repo, issue: integer(document.number), title: string(document.title) || `Issue #${source.item_id}`,
+		owner, repo, issue: integer(document.number) || Number(source.item_id), state: string(document.state), title: string(document.title) || `Issue #${source.item_id}`,
 		author: string(object(document.user).login), labels,
 		updatedAt: string(document.updated_at) || source.source_at, body: string(document.body)
+	};
+}
+
+/** Preserve retained PR metadata for the same table presentation as active work. */
+export function pullFromIndex(source: ReadIndexRow): IndexedPullRequest {
+	const document = object(source.document.document ?? source.document);
+	return {
+		number: integer(document.number) || Number(source.item_id),
+		title: string(document.title) || `Pull request #${source.item_id}`,
+		state: document.merged_at || document.merged === true ? 'merged' : string(document.state) || 'unknown',
+		draft: document.draft === true,
+		branch: string(object(document.head).ref), baseBranch: string(object(document.base).ref),
+		headSha: string(object(document.head).sha),
+		updatedAt: string(document.updated_at) || source.source_at
 	};
 }
 

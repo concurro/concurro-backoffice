@@ -11,7 +11,7 @@ const javascript = ts.transpileModule(source, {
 const output = new URL('../.svelte-kit/read-adapter-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, javascript);
-const { sponsorshipFromRead, turnsFromRead, runsFromRead, targetFromRead, targetConfigurationFromRead } = await import(output.href);
+const { issueFromIndex, pullFromIndex, sponsorshipFromRead, turnsFromRead, runsFromRead, targetFromRead, targetConfigurationFromRead } = await import(output.href);
 
 const prompt = {
 	instructions: { shared: 'Follow the plan', role: 'review' },
@@ -115,4 +115,43 @@ test('current target configuration preserves source and models separately from i
     const identity = targetFromRead({ upstream: 'acme/upstream', fork: 'acme/fork', issue_repository: 'acme/issues' });
     assert.equal(identity.roster.length, 0);
     assert.equal(identity.config.includes('max_model_calls'), false);
+});
+
+
+test('issue tables keep source identity, labels, author and state across both index shapes', () => {
+    const document = { number: 26, title: 'Keep MARF usable', state: 'closed', user: { login: 'author' },
+        labels: [{ name: 'concurro' }, 'bug'], updated_at: '2026-11-21T10:00:00Z' };
+    const row = { item_id: '26', source_at: '2026-11-20T10:00:00Z', document };
+    const issue = issueFromIndex(row, 'acme/fork');
+    assert.deepEqual(issueFromIndex({ ...row, document: { document } }, 'acme/fork'), issue);
+    assert.equal(issue.issue, 26);
+    assert.equal(issue.author, 'author');
+    assert.equal(issue.state, 'closed');
+    assert.deepEqual(issue.labels, ['concurro', 'bug']);
+    assert.equal(issue.updatedAt, document.updated_at);
+    assert.equal(issue.sponsorships, undefined);
+});
+
+test('retained PR tables preserve branch, head, update time and merged state', () => {
+    const document = { number: 52, title: 'Keep MARF usable', state: 'closed', merged_at: '2026-11-21T10:00:00Z',
+        draft: false, head: { ref: 'concurro/26', sha: 'a'.repeat(40) }, base: { ref: 'main' },
+        updated_at: '2026-11-21T10:00:00Z' };
+    const row = { item_id: '52', source_at: '', document };
+    const pull = pullFromIndex(row);
+    assert.deepEqual(pullFromIndex({ ...row, document: { document } }), pull);
+    assert.equal(pull.state, 'merged');
+    assert.equal(pull.branch, 'concurro/26');
+    assert.equal(pull.baseBranch, 'main');
+    assert.equal(pull.headSha, 'a'.repeat(40));
+    assert.equal(pull.updatedAt, document.updated_at);
+    assert.equal(pullFromIndex({ ...row, document: { ...document, state: 'open', merged_at: null, draft: true } }).draft, true);
+});
+
+test('sparse retained rows do not invent PR state, head or branch', () => {
+    const pull = pullFromIndex({ item_id: '9', source_at: '2026-11-21T10:00:00Z', document: {} });
+    assert.equal(pull.number, 9);
+    assert.equal(pull.state, 'unknown');
+    assert.equal(pull.branch, '');
+    assert.equal(pull.headSha, '');
+    assert.equal(pull.updatedAt, '2026-11-21T10:00:00Z');
 });

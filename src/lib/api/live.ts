@@ -3,7 +3,7 @@ import { base } from '#lib/paths.ts';
 import type { Command, LiveOperatorStatus, TargetConfiguration, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, RelayOverview, RelayPending, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
 import { ApiError, readModel, type ReadIndexPage, type ReadTarget, type ReadTargetConfiguration, type ReadTask, type ReadTaskDetail, type ReadTaskPage, type ReadTranscriptLine, type ReadTranscriptPage } from './read-model.ts';
-import { issueFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, runsFromRead, sponsorshipFromRead, targetFromRead, targetConfigurationFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
+import { issueFromIndex, pullFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, runsFromRead, sponsorshipFromRead, targetFromRead, targetConfigurationFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export { ApiError } from './read-model.ts';
@@ -161,11 +161,8 @@ export const api = {
 			const enrolled = new Set(tasks.map((item) => item.issue));
 			const issues = issueRows.map((item) => issueFromIndex(item, source.issue_repository))
 				.filter((item) => !enrolled.has(item.issue));
-			const indexedPulls = pullRows.map((row) => {
-				const item = (row.document.document ?? row.document) as Record<string, unknown>;
-				return { number: Number(item.number ?? row.item_id), title: String(item.title ?? `Pull request #${row.item_id}`),
-					state: item.merged_at ? 'merged' : String(item.state ?? 'unknown') };
-			}).sort((a, b) => b.number - a.number);
+			const indexedPulls = pullRows.map(pullFromIndex)
+				.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.number - a.number);
 			return { target, tasks, reviews, issues, indexedPulls } satisfies TargetView;
 		});
 	},
