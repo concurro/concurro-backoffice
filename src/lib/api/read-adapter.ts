@@ -1,5 +1,5 @@
-import type { ActionsRun, Budget, Finding, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, Task, TimelineEvent, Turn } from '#lib/types.ts';
-import type { ReadIndexRow, ReadTarget, ReadTask, ReadTaskDetail } from './read-model.ts';
+import type { ActionsRun, Budget, Finding, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, TargetConfiguration, Task, TimelineEvent, Turn } from '#lib/types.ts';
+import type { ReadIndexRow, ReadTarget, ReadTargetConfiguration, ReadTask, ReadTaskDetail } from './read-model.ts';
 
 /** Treat missing or malformed optional source fields as absent. */
 const object = (value: unknown): Record<string, unknown> =>
@@ -100,6 +100,15 @@ export function targetFromRead(source: ReadTarget): Target {
 		description: '', mode: 'manual', defaultBranch: '', roster: [],
 		config: JSON.stringify({ upstream: source.upstream, issue_repository: source.issue_repository, fork: source.fork }, null, 2), writer: true
 	};
+}
+
+/** Keep current configuration separate from task-pinned history and identity lists. */
+export function targetConfigurationFromRead(source: ReadTargetConfiguration): TargetConfiguration {
+    return {
+        mode: source.mode, defaultBranch: source.default_branch,
+        roster: source.roster, profiles: source.profiles,
+        config: JSON.stringify(source.settings, null, 2), source: source.source
+    };
 }
 
 /** Convert one durable issue-list row into the unenrolled issue view. */

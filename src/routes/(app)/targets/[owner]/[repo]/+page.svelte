@@ -32,6 +32,8 @@
 		return target && { target, tasks: session.tasks.filter(inTarget(target)), issues: session.issues.filter(inTarget(target)), reviews: [] as ReviewSummary[] };
 	});
 	const view = $derived<TargetView | undefined>(data.resource.value ?? known);
+	const configuration = $derived(view ? api.targetConfiguration(view.target.owner, view.target.repo) : undefined);
+    $effect(() => configuration?.watch());
 	const runsData = $derived(tab === 'runs' ? api.targetRuns(params.owner, params.repo) : undefined);
 	// Displayed while loading and after a failure too, so no live change is missed.
 	$effect(() => data.resource.watch());
@@ -58,7 +60,9 @@
 	<Skeleton rows={3} />
 	<Panel title="Issues"><Skeleton rows={8} /></Panel>
 {:else}
-	{@const { target, tasks, issues, reviews } = view}
+	{@const { tasks, issues, reviews } = view}
+    {@const current = configuration?.value}
+    {@const target = { ...view.target, ...current }}
 	{@const prs = tasks.filter((t) => t.pr)}
 	{@const retainedPulls = (view.indexedPulls ?? []).filter((pull) => !prs.some((task) => task.pr?.number === pull.number))}
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
@@ -69,10 +73,16 @@
 			<ArrowLeftRight size={14} aria-label="forked to" />
 			<span class="mono">{target.fork}</span>
 		</span>
-		<Badge tone={target.mode === 'autonomous' ? 'accent' : 'neutral'}>{target.mode}</Badge>
-		<span class="branch"><GitBranch size={13} aria-hidden="true" /><span class="mono">{target.defaultBranch}</span></span>
+		{#if current}
+            <Badge tone={current.mode === 'autonomous' ? 'accent' : 'neutral'}>{current.mode}</Badge>
+            <span class="branch"><GitBranch size={13} aria-hidden="true" /><span class="mono">{current.defaultBranch}</span></span>
+        {:else}<Badge tone="neutral">Configuration {configuration?.error ? 'unavailable' : 'loading'}</Badge>{/if}
 	</PageHeader>
 
+    {#if configuration?.error}
+        <Alert tone="warning" title="Current target configuration could not be loaded">Task lists remain available. Retry to read current model and policy settings.</Alert>
+        <ErrorState error={configuration.error} retry={configuration.refresh} />
+    {/if}
 	<ul class="roster" aria-label="Model roster">
 		{#each target.roster as r}
 			<li><span class="role">{r.agent}</span><span class="mono">{r.profile}</span></li>
@@ -205,6 +215,8 @@
 					<EmptyState icon={PlayCircle} title="No runs yet" text="Each agent turn executes as a GitHub Actions run on the fork." />
 				{/if}
 			</Panel>
+		{:else if !current}
+            <Panel title="Current target configuration">{#if configuration?.error}<p class="muted">Current models and policy settings are unavailable.</p>{:else}<Skeleton rows={6} />{/if}</Panel>
 		{:else}
 			<div class="config">
 				<Panel flush title="Model roster">
@@ -213,7 +225,7 @@
 						<thead><tr><th>Role</th><th>Agent</th><th>Profile</th><th>Provider</th><th>Model</th><th>Effort</th></tr></thead>
 						<tbody>
 							{#each target.roster as r}
-								{@const p = profile(r.profile)}
+								{@const p = current.profiles.find((p) => p.name === r.profile) ?? profile(r.profile)}
 								<tr><td>{roleLabel[r.role]}</td><td class="mono">{r.agent}</td><td class="mono">{p.name}</td><td>{p.provider}</td><td class="mono">{p.model}</td><td>{p.effort}</td></tr>
 							{/each}
 						</tbody>
@@ -221,7 +233,12 @@
 					{/if}
 				</Panel>
 				<Panel title="Target configuration">
-					{#snippet actions()}<span class="ro"><Lock size={12} aria-hidden="true" /> Read-only · configured repository identities</span>{/snippet}
+					{#snippet actions()}<span class="ro"><Lock size={12} aria-hidden="true" /> Read-only · current settings</span>{/snippet}
+                    {#if current.source}
+                        <p class="sub">Current <span class="mono">{current.source.repository}</span> · <span class="mono">{current.source.branch}</span></p>
+                        <p class="sub">Source commit <a class="mono" href={`https://github.com/${current.source.repository}/commit/${current.source.sha}`}>{current.source.sha}</a></p>
+                        <p class="sub">These settings apply to new work. Existing tasks retain their pinned configuration.</p>
+                    {/if}
 					<CodeBlock text={target.config} />
 				</Panel>
 			</div>

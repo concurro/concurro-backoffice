@@ -70,7 +70,7 @@ commit with `bash deploy/deploy.sh web FULL_COMMIT_SHA` from
 | ---- | ---- |
 | `/signin` | Sign-in |
 | `/` | Overview |
-| `/targets/[owner]/[repo]` | Target: issues, pull requests, Actions runs, configuration; writers can refresh its lists from GitHub in the `…` menu |
+| `/targets/[owner]/[repo]` | Target: issues, pull requests, Actions runs and current configuration |
 | `/tasks/[owner]/[repo]/[issue]` | Task detail |
 | `/issues/[owner]/[repo]/[issue]` | Provider consent before task enrollment |
 | `/tasks/[owner]/[repo]/[issue]/turns/[turn]` | Run diagnostics |
@@ -122,7 +122,7 @@ The warning timestamp identifies the last verified snapshot. Review times appear
 recorded. Fixture mode and APIs without cache metadata retain their existing behavior.
 
 Targets and their task details require write, maintain or admin permission on the upstream
-repository. Fork write permission is not required. The API enforces this for direct URLs as
+repository and read visibility of the fork. Fork write permission is not required. The API enforces this for direct URLs as
 well; command controls follow the returned writer permission.
 
 The portal renders provider-specific consent, selected credentials, recorded charges and recovery receipts.
@@ -156,6 +156,16 @@ Actions lists show the latest retained attempt per run, newest first. The task-h
 index links to issue archives, PRs and runs. Issue lists do not imply pending consent
 when no consent projection was supplied.
 
-The configuration tab currently shows repository identities; model rosters and the
-Operator dashboard are not yet exposed by the live API. These screens state that
-limitation instead of showing an empty roster or a retryable error.
+The target page loads current model assignments, profiles, mode, default branch and
+allowlisted policy limits independently through `/api/v2/targets/{owner}/{repo}/configuration`.
+It shows the source commit and distinguishes current settings from each task's pinned
+configuration. A failed configuration read leaves task lists available and shows a retry.
+Arbitrary raw config, MCP environment and credentials are not displayed.
+
+The live Operator page reads `/api/v2/operator`: projection readiness/revision, buffered
+received events, last event time, and stage/unfinished-turn counts for issues with current
+writer access. Unknown terminal outcomes are shown separately from unfinished turns.
+Loading counts remain unavailable until the baseline settles. This is a
+snapshot; reload to update. Gateway/host health, deployment drift, leases and live request
+queue telemetry remain unavailable. Operator actions run on the host. Fixture mode retains
+its demonstration dashboard and simulated actions.

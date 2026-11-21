@@ -11,7 +11,7 @@ const javascript = ts.transpileModule(source, {
 const output = new URL('../.svelte-kit/read-adapter-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, javascript);
-const { sponsorshipFromRead, turnsFromRead, runsFromRead, targetFromRead } = await import(output.href);
+const { sponsorshipFromRead, turnsFromRead, runsFromRead, targetFromRead, targetConfigurationFromRead } = await import(output.href);
 
 const prompt = {
 	instructions: { shared: 'Follow the plan', role: 'review' },
@@ -95,4 +95,24 @@ test('run lists keep the latest attempt once and put recent work first', () => {
 test('target configuration presents only the supplied repository identities', () => {
     const target = targetFromRead({ upstream: 'acme/upstream', fork: 'acme/fork', issue_repository: 'acme/issues', private: 'not for display' });
     assert.deepEqual(JSON.parse(target.config), { upstream: 'acme/upstream', issue_repository: 'acme/issues', fork: 'acme/fork' });
+});
+
+
+test('current target configuration preserves source and models separately from identities', () => {
+    const current = targetConfigurationFromRead({
+        mode: 'autonomous', default_branch: 'executor',
+        roster: [{ role: 'triage', agent: 'fast', profile: 'fast' }],
+        profiles: [{ name: 'fast', provider: 'openai', model: 'gpt-fast', effort: 'low' }],
+        settings: { max_model_calls: 48, base: 'main', limits: { changed_files: null } },
+        source: { repository: 'acme/fork', branch: 'executor', sha: 'a'.repeat(40) }
+    });
+    assert.equal(current.mode, 'autonomous');
+    assert.equal(current.defaultBranch, 'executor');
+    assert.equal(current.roster[0].profile, current.profiles[0].name);
+    assert.equal(current.profiles[0].model, 'gpt-fast');
+    assert.equal(JSON.parse(current.config).base, 'main');
+    assert.equal(current.source.sha, 'a'.repeat(40));
+    const identity = targetFromRead({ upstream: 'acme/upstream', fork: 'acme/fork', issue_repository: 'acme/issues' });
+    assert.equal(identity.roster.length, 0);
+    assert.equal(identity.config.includes('max_model_calls'), false);
 });

@@ -179,6 +179,28 @@ export interface Target {
 	writer?: boolean;
 }
 
+/** Current target configuration, loaded separately from saved task and list data. */
+export interface TargetConfiguration {
+    mode: Mode;
+    defaultBranch: string;
+    roster: RosterEntry[];
+    profiles: ModelProfile[];
+    config: string;
+    source?: { repository: string; branch: string; sha: string };
+}
+
+/** Read-only operational state; turn observations separate unknown outcomes from unfinished work. */
+export interface LiveOperatorStatus {
+    kind: 'live';
+    observed_at: string;
+    projection: { ready: boolean; revision: number; buffered_events: number; last_event_at: string | null };
+    /** Null until the baseline is ready; every row requires issue-specific writer access. */
+    tasks: { id: string; kind: string; repository: string; issue_number: number; title: string | null;
+        stage: string; reason: string | null; turns: Record<string, number> }[] | null;
+    stages: Record<string, number> | null;
+    turns: Record<string, number> | null;
+}
+
 export interface Budget {
 	used: number;
 	max: number;

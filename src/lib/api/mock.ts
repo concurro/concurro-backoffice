@@ -3,7 +3,7 @@ import { api as fixtures, NotFound } from '#lib/mock/api.ts';
 import { ME, MOCK_ACTOR_ID, profiles, users } from '#lib/mock/reference.ts';
 import * as credentials from '#lib/mock/credentials.svelte.ts';
 import { credentialsChanged, runCommand, runReviewCommand } from '#lib/state/store.svelte.ts';
-import type { Command, CredentialEntry, CredentialList, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueRef, Provider, Overview, Report, ReviewCommand, ReviewView, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
+import type { Command, CredentialEntry, CredentialList, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueRef, Provider, Overview, Report, ReviewCommand, ReviewView, TargetConfiguration, TargetRuns, TargetView, Task, TaskSection, TaskView, TurnRuns } from '#lib/types.ts';
 import { apply } from './events.ts';
 import { ApiError } from './live.ts';
 import { remember, session } from './session.svelte.ts';
@@ -25,6 +25,12 @@ export const api = {
 		});
 	},
 	target: (owner: string, repo: string) => cached<TargetView>(`target:${owner}/${repo}`, () => fixtures.target(owner, repo)),
+    /** Fixture configuration uses the same independently loaded target panel. */
+    targetConfiguration: (owner: string, repo: string) => cached<TargetConfiguration>(`configuration:${owner}/${repo}`, async () => {
+        const { target } = await fixtures.target(owner, repo);
+        remember({ profiles: target.profiles });
+        return { ...target, profiles: target.profiles ?? [] };
+    }),
 	targetRuns: (owner: string, repo: string) => cached<TargetRuns>(`runs:${owner}/${repo}`, () => fixtures.targetRuns(owner, repo)),
 	issue: fixtures.issue,
 	logoutStatus: async () => ({ remote: 'revoked' }),

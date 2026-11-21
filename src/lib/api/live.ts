@@ -1,9 +1,9 @@
 import { cached, cacheEpoch, clearTaskCache } from './cache.svelte.ts';
 import { base } from '#lib/paths.ts';
-import type { Command, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, RelayOverview, RelayPending, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
+import type { Command, LiveOperatorStatus, TargetConfiguration, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, RelayOverview, RelayPending, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
-import { ApiError, readModel, type ReadIndexPage, type ReadTarget, type ReadTask, type ReadTaskDetail, type ReadTaskPage, type ReadTranscriptLine, type ReadTranscriptPage } from './read-model.ts';
-import { issueFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, runsFromRead, sponsorshipFromRead, targetFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
+import { ApiError, readModel, type ReadIndexPage, type ReadTarget, type ReadTargetConfiguration, type ReadTask, type ReadTaskDetail, type ReadTaskPage, type ReadTranscriptLine, type ReadTranscriptPage } from './read-model.ts';
+import { issueFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, runsFromRead, sponsorshipFromRead, targetFromRead, targetConfigurationFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export { ApiError } from './read-model.ts';
@@ -169,6 +169,14 @@ export const api = {
 			return { target, tasks, reviews, issues, indexedPulls } satisfies TargetView;
 		});
 	},
+    /** Read current allowlisted settings independently from target task/index loading. */
+    targetConfiguration: (owner: string, repo: string) =>
+        cached(`configuration:${path(owner, repo)}`, async (): Promise<TargetConfiguration> => {
+            const source = await readModel<ReadTargetConfiguration>(`/targets/${path(owner, repo)}/configuration`);
+            const configuration = targetConfigurationFromRead(source);
+            remember({ profiles: configuration.profiles });
+            return configuration;
+        }),
 	/** Load a target's Actions runs only when their tab is opened. */
 	targetRuns: (owner: string, repo: string) =>
 		cached(`runs:${path(owner, repo)}`, async (): Promise<TargetRuns> => {
@@ -332,7 +340,7 @@ export const api = {
 	/** The device name and exact routes a displayed Sponsor code registered. */
 	pendingRelay: (code: string) => request<RelayPending>('POST', '/api/me/credentials/relay/pending', { code }),
 	logoutStatus: () => request<{ remote: string }>('GET', '/auth/logout-status'),
-	operator: async () => null,
+	operator: () => readModel<LiveOperatorStatus>('/operator'),
 	/** Synchronous index for the command palette, from what has been loaded so far. */
 	index: () => ({ targets: session.targets, tasks: session.tasks })
 };

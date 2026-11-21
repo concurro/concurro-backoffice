@@ -1,3 +1,4 @@
+import type { Mode, ModelProfile, RosterEntry } from '#lib/types.ts';
 import { base } from '#lib/paths.ts';
 import { MOCK } from './mode.ts';
 import { tasks as mockTasks } from '#lib/mock/tasks.ts';
@@ -48,6 +49,16 @@ export interface ReadTarget {
 	upstream: string;
 	issue_repository: string;
 	fork: string;
+}
+
+/** Allowlisted current settings read at an exact fork commit. */
+export interface ReadTargetConfiguration {
+    mode: Mode;
+    default_branch: string;
+    roster: RosterEntry[];
+    profiles: ModelProfile[];
+    settings: Record<string, unknown>;
+    source: { repository: string; branch: string; sha: string };
 }
 
 /** One durable GitHub list row from the task service. */
