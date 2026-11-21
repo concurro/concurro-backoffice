@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleCheck, GitCompareArrows, ListOrdered, LockKeyhole, ShieldQuestion, TriangleAlert } from 'lucide-svelte';
+	import { CircleCheck, GitCompareArrows, ListOrdered, LockKeyhole, ServerCog, ShieldQuestion, TriangleAlert } from 'lucide-svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import DataTable from '#lib/components/DataTable.svelte';
@@ -35,6 +35,9 @@
 	<Panel title="Unknown GitHub writes"><Skeleton rows={3} /></Panel>
 	<Panel title="Deployment drift"><Skeleton rows={3} /></Panel>
 {:then op}
+	{#if !op}
+		<EmptyState icon={ServerCog} title="Operator dashboard is not available yet" text="Service administration is not currently supported in the backoffice." />
+	{:else}
 	{@const writes = op.unknownWrites.filter((w) => !resolved.includes(w.id))}
 	{@const stale = op.leases.filter((l) => l.stale).length}
 	{@const drifted = op.drift.filter((d) => !d.inSync).length}
@@ -147,6 +150,7 @@
 			{/each}
 		</div>
 	</Panel>
+	{/if}
 {:catch error}
 	<ErrorState {error} />
 {/await}

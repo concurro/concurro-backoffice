@@ -11,7 +11,7 @@ const javascript = ts.transpileModule(source, {
 const output = new URL('../.svelte-kit/read-adapter-test.mjs', import.meta.url);
 await mkdir(new URL('../.svelte-kit/', import.meta.url), { recursive: true });
 await writeFile(output, javascript);
-const { sponsorshipFromRead, turnsFromRead } = await import(output.href);
+const { sponsorshipFromRead, turnsFromRead, runsFromRead, targetFromRead } = await import(output.href);
 
 const prompt = {
 	instructions: { shared: 'Follow the plan', role: 'review' },
@@ -77,4 +77,22 @@ test('withdrawal remains visible with the retained provider funding state', () =
 	assert.equal(view.provider_funding.openai, 'contributed');
 	assert.equal(view.history[0].transition, 'withdraw');
 	assert.equal(view.facts[0].command, 'withdraw');
+});
+
+
+test('run lists keep the latest attempt once and put recent work first', () => {
+    const row = (id, attempt, created_at, conclusion = 'success') => ({ item_id: `${id}/${attempt}`, source_at: created_at,
+        document: { id, attempt, created_at, status: 'completed', conclusion, head_branch: 'task/plan' } });
+    const runs = runsFromRead([
+        row(1, 2, '2026-11-20T10:00:00Z', 'failure'), row(1, 1, '2026-11-20T09:00:00Z'),
+        row(2, 1, '2026-11-21T10:00:00Z'), row(1, 2, '2026-11-20T10:00:00Z', 'failure')
+    ]);
+    assert.deepEqual(runs.map((run) => [run.id, run.attempt]), [[2, 1], [1, 2]]);
+    assert.equal(runs[1].status, 'failure');
+    assert.equal(runs[1].title, 'task/plan');
+});
+
+test('target configuration presents only the supplied repository identities', () => {
+    const target = targetFromRead({ upstream: 'acme/upstream', fork: 'acme/fork', issue_repository: 'acme/issues', private: 'not for display' });
+    assert.deepEqual(JSON.parse(target.config), { upstream: 'acme/upstream', issue_repository: 'acme/issues', fork: 'acme/fork' });
 });

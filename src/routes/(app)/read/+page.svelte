@@ -120,7 +120,13 @@
 					<h3>{kind === 'issue' ? 'Issues' : kind === 'pull' ? 'Pull requests' : 'Executor runs'}</h3>
 					<ul>
 						{#each index[kind as 'issue' | 'pull' | 'run'] as row (row.item_id)}
-							<li><strong>#{row.item_id}</strong> {String(row.document.title ?? row.document.status ?? '')}</li>
+							<li>{#if kind === 'issue'}
+                                <a href={withBase(`/issues/${targets.find((target) => target.upstream === selected)?.issue_repository ?? selected}/${row.item_id}`)}>#{row.item_id} {String(row.document.title ?? '')}</a>
+                            {:else if kind === 'pull'}
+                                <a href={`https://github.com/${selected}/pull/${row.item_id}`}>#{row.item_id} {String(row.document.title ?? '')}</a>
+                            {:else}
+                                <a href={`https://github.com/${targets.find((target) => target.upstream === selected)?.fork}/actions/runs/${row.item_id.split('/')[0]}`}>#{row.item_id}</a> {String(row.document.status ?? '')}
+                            {/if}</li>
 						{:else}
 							<li class="muted">No entries.</li>
 						{/each}

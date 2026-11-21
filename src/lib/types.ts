@@ -741,6 +741,8 @@ export interface Overview {
 
 /** `GET /api/targets/{owner}/{repo}`. */
 export interface TargetView {
+	/** Retained PRs, including work completed before the current controller. */
+	indexedPulls?: { number: number; title: string; state: string }[];
 	reviews: ReviewSummary[];
 	issues: IssueIntent[];
 	target: Target;

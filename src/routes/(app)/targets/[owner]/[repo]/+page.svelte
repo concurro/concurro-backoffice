@@ -20,7 +20,7 @@
 	import { withBase } from '#lib/paths.ts';
 	import { PARKED_STAGES, inTarget, issueRepositories, taskStage, roleLabel, taskStageMeta } from '#lib/meta.ts';
 	import { api, profile, session } from '#lib/api/index.ts';
-	import type { ActionsRun, ReviewSummary, Stage, Task, Tone } from '#lib/types.ts';
+	import type { ActionsRun, ReviewSummary, Stage, Task, TargetView, Tone } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data, params }: PageProps = $props();
@@ -31,7 +31,7 @@
 		const target = session.targets.find((t) => [`${t.owner}/${t.repo}`, t.fork, ...issueRepositories(t)].includes(name));
 		return target && { target, tasks: session.tasks.filter(inTarget(target)), issues: session.issues.filter(inTarget(target)), reviews: [] as ReviewSummary[] };
 	});
-	const view = $derived(data.resource.value ?? known);
+	const view = $derived<TargetView | undefined>(data.resource.value ?? known);
 	const runsData = $derived(tab === 'runs' ? api.targetRuns(params.owner, params.repo) : undefined);
 	// Displayed while loading and after a failure too, so no live change is missed.
 	$effect(() => data.resource.watch());
@@ -60,6 +60,7 @@
 {:else}
 	{@const { target, tasks, issues, reviews } = view}
 	{@const prs = tasks.filter((t) => t.pr)}
+	{@const retainedPulls = (view.indexedPulls ?? []).filter((pull) => !prs.some((task) => task.pr?.number === pull.number))}
 	{#if data.resource.error}<ErrorState error={data.resource.error} retry={data.resource.refresh} />{/if}
 	<SavedData resource={data.resource} label="list" />
 	<PageHeader title="{target.owner}/{target.repo}" subtitle={target.description}>
@@ -81,8 +82,8 @@
 	<Tabs
 		bind:value={tab}
 		tabs={[
-			{ value: 'issues', label: 'Issues', count: tasks.length },
-			{ value: 'pulls', label: 'Pull requests', count: prs.length + reviews.length },
+			{ value: 'issues', label: 'Issues', count: tasks.length + issues.length },
+			{ value: 'pulls', label: 'Pull requests', count: prs.length + reviews.length + retainedPulls.length },
 			{ value: 'runs', label: 'Actions runs' },
 			{ value: 'config', label: 'Configuration' }
 		]}
@@ -121,6 +122,7 @@
 			</Panel>
 		{:else if tab === 'pulls'}
 			<ReviewList {reviews} />
+			{#if prs.length || !retainedPulls.length}
 			<Panel flush title="Pull requests from Concurro" meta={String(prs.length)}>
 				{#if prs.length}
 					<DataTable label="Pull requests">
@@ -143,10 +145,19 @@
 							{/each}
 						</tbody>
 					</DataTable>
-				{:else}
+				{:else if !retainedPulls.length}
 					<EmptyState icon={GitPullRequest} title="No pull requests yet" text="Concurro opens a draft pull request from the fork when an implementation is published." />
 				{/if}
 			</Panel>
+            {/if}
+            {#if retainedPulls.length}
+                <Panel title="Retained pull requests" meta={String(retainedPulls.length)}>
+                    <ul>{#each retainedPulls as pull (pull.number)}<li>
+                        <a href={`https://github.com/${target.owner}/${target.repo}/pull/${pull.number}`}>#{pull.number} · {pull.title}</a>
+                        <Badge plain tone="neutral">{pull.state}</Badge>
+                    </li>{/each}</ul>
+                </Panel>
+            {/if}
 		{:else if tab === 'runs' && !runsData?.value}
 			{#if runsData?.error}
 				<ErrorState error={runsData.error} retry={runsData.refresh} />
@@ -168,7 +179,7 @@
 							{#each runs as run (run.id)}
 								<tr>
 									<td class="mono nowrap">
-										{run.id}{#if run.attempt && run.attempt > 1}<span class="muted"> ·{run.attempt}</span>{/if}
+										<a href={`https://github.com/${target.fork}/actions/runs/${run.id}`}>{run.id}</a>{#if run.attempt && run.attempt > 1}<span class="muted"> ·{run.attempt}</span>{/if}
 									</td>
 									<td class="title">
 										{#if run.task && run.turn}
@@ -197,6 +208,7 @@
 		{:else}
 			<div class="config">
 				<Panel flush title="Model roster">
+					{#if !target.roster.length}<EmptyState title="Model roster unavailable" text="Model configuration is not available in this view yet." />{:else}
 					<DataTable label="Model roster">
 						<thead><tr><th>Role</th><th>Agent</th><th>Profile</th><th>Provider</th><th>Model</th><th>Effort</th></tr></thead>
 						<tbody>
@@ -206,9 +218,10 @@
 							{/each}
 						</tbody>
 					</DataTable>
+					{/if}
 				</Panel>
 				<Panel title="Target configuration">
-					{#snippet actions()}<span class="ro"><Lock size={12} aria-hidden="true" /> Read-only · managed in the service repository</span>{/snippet}
+					{#snippet actions()}<span class="ro"><Lock size={12} aria-hidden="true" /> Read-only · configured repository identities</span>{/snippet}
 					<CodeBlock text={target.config} />
 				</Panel>
 			</div>

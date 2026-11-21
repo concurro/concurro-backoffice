@@ -146,3 +146,16 @@ Personal credentials are saved without provider validation or model selection. A
 first enabled entry that matches its role and profile; a rejected token is reported during
 execution, where the next matching entry is tried. Writes name the revision last read, so a
 list changed elsewhere is reloaded instead of overwritten.
+
+
+## Retained history
+
+The live frontend reads task and index projections from `/api/v2`. Target pull-request
+lists include retained PRs from before the controller cutover, with links to GitHub.
+Actions lists show the latest retained attempt per run, newest first. The task-history
+index links to issue archives, PRs and runs. Issue lists do not imply pending consent
+when no consent projection was supplied.
+
+The configuration tab currently shows repository identities; model rosters and the
+Operator dashboard are not yet exposed by the live API. These screens state that
+limitation instead of showing an empty roster or a retryable error.

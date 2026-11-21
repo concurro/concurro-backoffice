@@ -7,8 +7,8 @@
 	let { issues }: { issues: IssueIntent[] } = $props();
 </script>
 {#if issues.length}
-	<Panel title="Issue provider consent" meta="provider consent">
-		<ul>{#each issues as issue}<li><a href={issueHref(issue)}>{issue.owner}/{issue.repo}#{issue.issue} · {issue.title}</a><Badge plain tone="neutral">{issue.sponsorships?.status ?? 'pending'}</Badge>{#each Object.entries(issue.sponsorships?.slots ?? {}) as [provider, slot]}{#if slot?.sponsor_id}<span>{provider}: @{slot.login ?? slot.sponsor_id}</span>{/if}{/each}{#if issue.sponsorships?.calls !== undefined}<span>{issue.sponsorships.calls} charged task attempts · {issue.sponsorships.funding === 'org' ? 'organization funded' : 'historical payer attribution retained'}</span>{/if}{#if issue.sponsorships?.task_stage === 'awaiting_credentials'}<Badge plain tone="warning">{recoveryQueued(issue.sponsorships.recovery) ? 'selecting a credential' : issue.sponsorships.recovery?.eligible ? 'waiting for credentials' : 'writer action required'}</Badge>{/if}</li>{/each}</ul>
+	<Panel title="Issues" meta={String(issues.length)}>
+		<ul>{#each issues as issue}<li><a href={issueHref(issue)}>{issue.owner}/{issue.repo}#{issue.issue} · {issue.title}</a>{#if issue.sponsorships}<Badge plain tone="neutral">{issue.sponsorships.status}</Badge>{/if}{#each Object.entries(issue.sponsorships?.slots ?? {}) as [provider, slot]}{#if slot?.sponsor_id}<span>{provider}: @{slot.login ?? slot.sponsor_id}</span>{/if}{/each}{#if issue.sponsorships?.calls !== undefined}<span>{issue.sponsorships.calls} charged task attempts · {issue.sponsorships.funding === 'org' ? 'organization funded' : 'historical payer attribution retained'}</span>{/if}{#if issue.sponsorships?.task_stage === 'awaiting_credentials'}<Badge plain tone="warning">{recoveryQueued(issue.sponsorships.recovery) ? 'selecting a credential' : issue.sponsorships.recovery?.eligible ? 'waiting for credentials' : 'writer action required'}</Badge>{/if}</li>{/each}</ul>
 	</Panel>
 {/if}
 <style>

@@ -1,4 +1,4 @@
-import type { Budget, Finding, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, Task, TimelineEvent, Turn } from '#lib/types.ts';
+import type { ActionsRun, Budget, Finding, IssueIntent, ReviewSummary, ReviewTask, Sponsorship, Stage, Target, Task, TimelineEvent, Turn } from '#lib/types.ts';
 import type { ReadIndexRow, ReadTarget, ReadTask, ReadTaskDetail } from './read-model.ts';
 
 /** Treat missing or malformed optional source fields as absent. */
@@ -97,7 +97,8 @@ export function targetFromRead(source: ReadTarget): Target {
 	const [owner, repo] = source.upstream.split('/');
 	return {
 		owner, repo, fork: source.fork, issueRepositories: [source.issue_repository],
-		description: '', mode: 'manual', defaultBranch: '', roster: [], config: '', writer: true
+		description: '', mode: 'manual', defaultBranch: '', roster: [],
+		config: JSON.stringify({ upstream: source.upstream, issue_repository: source.issue_repository, fork: source.fork }, null, 2), writer: true
 	};
 }
 
@@ -358,4 +359,22 @@ export async function turnsFromRead(
 			} satisfies Turn;
 		});
 	return [...live, ...imported].sort((a, b) => a.n - b.n);
+}
+
+/** Show each run's latest retained attempt, with the newest work first. */
+export function runsFromRead(rows: ReadIndexRow[]): ActionsRun[] {
+	const latest = new Map<number, ActionsRun>();
+	for (const row of rows) {
+		const item = row.document;
+		const id = integer(item.id) || Number(row.item_id.split('/')[0]);
+		const attempt = integer(item.attempt) || integer(item.run_attempt) || 1;
+		if ((latest.get(id)?.attempt ?? 0) > attempt) continue;
+		const startedAt = string(item.created_at) || row.source_at;
+		latest.set(id, {
+			id, attempt, title: string(item.display_title) || string(item.name) || string(item.head_branch) || `Run #${id}`,
+			status: (string(item.conclusion) || string(item.status) || 'queued') as ActionsRun['status'],
+			issue: null, turn: null, startedAt, durationS: 0
+		});
+	}
+	return [...latest.values()].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.id - a.id);
 }

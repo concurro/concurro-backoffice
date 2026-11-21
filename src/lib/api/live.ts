@@ -3,7 +3,7 @@ import { base } from '#lib/paths.ts';
 import type { Command, TargetView, CredentialEntry, CredentialList, CredentialListing, CredentialPolicy, CredentialSecret, CredentialTypeId, IssueIntent, IssueRef, ModelProfile, Overview, RelayOverview, RelayPending, Report, ReviewCommand, ReviewView, Target, TargetRuns, Task, TaskSection, TaskView, Turn, TurnRuns } from '#lib/types.ts';
 import { follow, type ChangeSource } from './events.ts';
 import { ApiError, readModel, type ReadIndexPage, type ReadTarget, type ReadTask, type ReadTaskDetail, type ReadTaskPage, type ReadTranscriptLine, type ReadTranscriptPage } from './read-model.ts';
-import { issueFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, sponsorshipFromRead, targetFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
+import { issueFromIndex, reportArtifact, reviewFromRead, reviewSummaryFromRead, runsFromRead, sponsorshipFromRead, targetFromRead, taskFromRead, turnsFromRead } from './read-adapter.ts';
 import { remember, session, type Me } from './session.svelte.ts';
 
 export { ApiError } from './read-model.ts';
@@ -152,29 +152,28 @@ export const api = {
 			if (!source) throw new ApiError(404, 'Target is unavailable.');
 			const target = targetFromRead(source);
 			const [upstreamOwner, upstreamRepo] = source.upstream.split('/');
-			const [taskRows, issueRows] = await Promise.all([
-				readTasks(source.upstream), readIndex(upstreamOwner, upstreamRepo, 'issue')
+			const [taskRows, issueRows, pullRows] = await Promise.all([
+				readTasks(source.upstream), readIndex(upstreamOwner, upstreamRepo, 'issue'),
+				readIndex(upstreamOwner, upstreamRepo, 'pull')
 			]);
 			const tasks = taskRows.filter((item) => item.kind === 'contribution').map((item) => taskFromRead(item));
 			const reviews = taskRows.filter((item) => item.kind === 'standalone_pr_review').map(reviewSummaryFromRead);
 			const enrolled = new Set(tasks.map((item) => item.issue));
 			const issues = issueRows.map((item) => issueFromIndex(item, source.issue_repository))
 				.filter((item) => !enrolled.has(item.issue));
-			return { target, tasks, reviews, issues } satisfies TargetView;
+			const indexedPulls = pullRows.map((row) => {
+				const item = (row.document.document ?? row.document) as Record<string, unknown>;
+				return { number: Number(item.number ?? row.item_id), title: String(item.title ?? `Pull request #${row.item_id}`),
+					state: item.merged_at ? 'merged' : String(item.state ?? 'unknown') };
+			}).sort((a, b) => b.number - a.number);
+			return { target, tasks, reviews, issues, indexedPulls } satisfies TargetView;
 		});
 	},
 	/** Load a target's Actions runs only when their tab is opened. */
 	targetRuns: (owner: string, repo: string) =>
 		cached(`runs:${path(owner, repo)}`, async (): Promise<TargetRuns> => {
 			const rows = await readIndex(owner, repo, 'run');
-			return { runs: rows.map((row) => {
-				const item = row.document;
-				return {
-					id: Number(item.id ?? row.item_id), title: String(item.name ?? item.display_title ?? row.item_id),
-					status: String(item.conclusion ?? item.status ?? 'queued') as TargetRuns['runs'][number]['status'],
-					issue: null, turn: null, startedAt: String(item.created_at ?? row.source_at), durationS: 0
-				};
-			}), message: null } satisfies TargetRuns;
+			return { runs: runsFromRead(rows), message: null } satisfies TargetRuns;
 		}),
 	async task(owner: string, repo: string, issue: number): Promise<{ task: Task; target: Target; issueWriter: boolean }> {
 		return readTaskView(owner, repo, issue);
@@ -333,9 +332,7 @@ export const api = {
 	/** The device name and exact routes a displayed Sponsor code registered. */
 	pendingRelay: (code: string) => request<RelayPending>('POST', '/api/me/credentials/relay/pending', { code }),
 	logoutStatus: () => request<{ remote: string }>('GET', '/auth/logout-status'),
-	operator: async (): Promise<never> => {
-		throw new ApiError(501, 'Operator views are not available yet.');
-	},
+	operator: async () => null,
 	/** Synchronous index for the command palette, from what has been loaded so far. */
 	index: () => ({ targets: session.targets, tasks: session.tasks })
 };
