@@ -65,6 +65,7 @@ export const stageMeta: Record<Stage, Meta> = {
 	publish: m('Publishing', 'info', Upload),
 	review: m('PR review', 'info', GitPullRequest),
 	gates: m('Ready for humans', 'success', CircleCheck),
+	ready: m('Ready for humans', 'success', CircleCheck),
 	/** Legacy: set only by older engines; current engines record every human merge as `observed_merged`. */
 	merged: m('Merged', 'accent', GitMerge),
 	observed_merged: m('Merged', 'accent', GitMerge),
@@ -190,7 +191,7 @@ export const steps: { key: string; label: string; stages: Stage[] }[] = [
 	{ key: 'design', label: 'Design review', stages: ['plan_qc', 'planned'] },
 	{ key: 'implement', label: 'Implement', stages: ['implement', 'publish'] },
 	{ key: 'review', label: 'PR review', stages: ['review'] },
-	{ key: 'handoff', label: 'Handoff', stages: ['gates', ...MERGED_STAGES] }
+	{ key: 'handoff', label: 'Handoff', stages: ['gates', 'ready', ...MERGED_STAGES] }
 ];
 
 export const stepIndex = (stage: Stage) => steps.findIndex((s) => s.stages.includes(stage));

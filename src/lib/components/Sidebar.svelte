@@ -26,7 +26,7 @@
 	});
 
 	const groups = $derived<{ label?: string; items: Item[]; targets?: typeof targetGroups }[]>([
-		{ items: [i('/', 'Overview', LayoutDashboard)] },
+		{ items: [i('/', 'Overview', LayoutDashboard), i('/read', 'Task history', LayoutDashboard)] },
 		{ label: 'Targets', items: [], targets: targetGroups },
 		{ label: 'Me', items: [i('/me/credentials', 'My credentials', KeyRound), i('/me/sponsorships', 'My sponsorships', HandCoins)] },
 		{ label: 'Admin', items: [i('/admin', 'Operator', ServerCog), i('/styleguide', 'Styleguide', Palette)] }

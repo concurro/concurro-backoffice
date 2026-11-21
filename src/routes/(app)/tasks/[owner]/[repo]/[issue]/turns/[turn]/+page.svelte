@@ -12,7 +12,7 @@
 	import Tabs from '#lib/components/Tabs.svelte';
 	import { absTime, duration, parseUnified, relTime } from '#lib/format.ts';
 	import { outcomeMeta, roleLabel, stageMeta } from '#lib/meta.ts';
-	import { profile } from '#lib/api/index.ts';
+	import { api, profile } from '#lib/api/index.ts';
 	import type { TranscriptItem } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
@@ -38,7 +38,7 @@
 
 {#await data.result}
 	<Skeleton rows={12} />
-{:then { turns }}
+{:then { task, turns }}
 	{@const turn = turns.find((t) => t.n === Number(params.turn))}
 	{#if !turn}
 		<EmptyState title="Turn {params.turn} does not exist" text="This task has {turns.length} turns." />
@@ -105,7 +105,25 @@
 					</ol>
 					{#if turn.outcome !== 'ok' && turn.outcome !== 'failed'}<p class="cut muted">Transcript ends here: the turn was {turn.outcome}.</p>{/if}
 				{:else}
-					<EmptyState icon={MessagesSquare} title="No transcript" text="The turn never reached the model, so there are no messages or tool calls." />
+					{#await api.turnTranscript(task.id ?? '', turn.id ?? '')}
+						<Skeleton rows={6} />
+					{:then lines}
+						{#if lines.length}
+							<ol class="transcript">
+								{#each lines as line (line.position)}
+									<li class="tool">
+										<Collapsible title={line.kind || 'Archive event'} meta={`${line.member_path}:${line.line_number}`} mono>
+											<CodeBlock flush json={line.json !== null} text={line.json === null ? line.fallback_base64 || line.diagnostic || '' : JSON.stringify(line.json, null, 2)} />
+										</Collapsible>
+									</li>
+								{/each}
+							</ol>
+						{:else}
+							<EmptyState icon={MessagesSquare} title="No transcript" text="No archived transcript is available for this turn." />
+						{/if}
+					{:catch error}
+						<Alert tone="caution" title="Transcript unavailable">{error instanceof Error ? error.message : 'The archive could not be read.'}</Alert>
+					{/await}
 				{/if}
 			{:else if tab === 'response'}
 				{#if turn.validationErrors.length}

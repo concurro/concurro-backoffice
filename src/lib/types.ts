@@ -8,6 +8,7 @@ export type Stage =
 	| 'publish'
 	| 'review'
 	| 'gates'
+	| 'ready'
 	| 'merged'
 	| 'observed_merged'
 	| 'closed'
@@ -156,6 +157,8 @@ export interface IssueIntent extends IssueRef {
     updatedAt: string;
     body?: string;
     sponsorships?: Sponsorship;
+	/** Imported Python turns retained after cutover, including unenrolled issues. */
+	historicalTurns?: { deployment: string; sourceId: string; stage: string; status: string }[];
 }
 
 export interface Target {
@@ -329,6 +332,8 @@ export interface TaskView {
 }
 
 export interface Task {
+	/** Stable Rust task identity for versioned read-model detail routes. */
+	id?: string;
 	/** Checkpoint and issue revision used to separate cached phase responses. */
 	revision?: string;
 	/** Recorded work in each step, independent of loaded phase bodies. */

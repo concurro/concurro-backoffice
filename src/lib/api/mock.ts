@@ -56,6 +56,8 @@ export const api = {
 				throw new ApiError(error instanceof NotFound ? 404 : 409, error.message);
 			})),
 	turns: fixtures.turns,
+	/** Mock turns already include rendered transcript items. */
+	turnTranscript: async () => [],
 	/** Project the fixture's runner into the same shape as live Actions evidence. */
 	async turnRuns(owner: string, repo: string, issue: number, identifier: string): Promise<TurnRuns> {
 		const { turns } = await fixtures.turns(owner, repo, issue);

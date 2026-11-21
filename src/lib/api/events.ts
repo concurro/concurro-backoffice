@@ -38,7 +38,10 @@ export function follow(open: () => ChangeSource): () => void {
 		for (const type of ['change', 'reload'])
 			source.addEventListener(type, (event) => {
 				try {
-					apply(JSON.parse(event.data) as LiveChange);
+					const payload = JSON.parse(event.data) as LiveChange & { type?: string };
+					apply(payload.type === 'reload'
+						? { kind: 'reload', repository: null, issue: null, targets: [] }
+						: payload);
 				} catch {
 					// A malformed event changes nothing.
 				}
