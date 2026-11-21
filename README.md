@@ -153,7 +153,11 @@ list changed elsewhere is reloaded instead of overwritten.
 The live frontend reads task and index projections from `/api/v2`. Target pull-request
 lists include retained PRs from before the controller cutover, with links to GitHub.
 Retained issues and PRs use the shared tables, showing available state, labels, author,
-branch, commit and update metadata without inventing task stages or review results.
+branch, commit and update metadata. The Stage column uses the issue’s Concurro stage
+label, as the Python list did; PRs use their task branch to find that issue. It remains
+separate from GitHub open/closed/draft state. Final `gates` and `ready` stages are
+labelled “Merge signoff”. Missing or conflicting stage labels do not imply readiness.
+Review results are shown only when their projection is available.
 Actions lists show the latest retained attempt per run, newest first. The task-history
 index links to issue archives, PRs and runs. Issue lists do not imply pending consent
 when no consent projection was supplied.

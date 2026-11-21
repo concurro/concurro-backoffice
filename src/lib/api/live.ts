@@ -159,9 +159,9 @@ export const api = {
 			const tasks = taskRows.filter((item) => item.kind === 'contribution').map((item) => taskFromRead(item));
 			const reviews = taskRows.filter((item) => item.kind === 'standalone_pr_review').map(reviewSummaryFromRead);
 			const enrolled = new Set(tasks.map((item) => item.issue));
-			const issues = issueRows.map((item) => issueFromIndex(item, source.issue_repository))
-				.filter((item) => !enrolled.has(item.issue));
-			const indexedPulls = pullRows.map(pullFromIndex)
+			const indexedIssues = issueRows.map((item) => issueFromIndex(item, source.issue_repository));
+			const issues = indexedIssues.filter((item) => !enrolled.has(item.issue));
+			const indexedPulls = pullRows.map((row) => pullFromIndex(row, indexedIssues))
 				.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.number - a.number);
 			return { target, tasks, reviews, issues, indexedPulls } satisfies TargetView;
 		});

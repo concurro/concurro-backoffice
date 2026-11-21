@@ -117,7 +117,10 @@ export function issueFromIndex(source: ReadIndexRow, repository: string): IssueI
 	const [owner, repo] = repository.split('/');
 	const labels = Array.isArray(document.labels) ? document.labels.map((item) =>
 		string(typeof item === 'string' ? item : object(item).name)).filter(Boolean) : [];
+	const stages = [...new Set(labels.filter((label) => label.startsWith('concurro:stage:'))
+		.map((label) => label.slice('concurro:stage:'.length).replaceAll('-', '_')).filter(Boolean))];
 	return {
+		workflowStage: stages.length === 1 ? stages[0] : undefined,
 		owner, repo, issue: integer(document.number) || Number(source.item_id), state: string(document.state), title: string(document.title) || `Issue #${source.item_id}`,
 		author: string(object(document.user).login), labels,
 		updatedAt: string(document.updated_at) || source.source_at, body: string(document.body)
@@ -125,14 +128,20 @@ export function issueFromIndex(source: ReadIndexRow, repository: string): IssueI
 }
 
 /** Preserve retained PR metadata for the same table presentation as active work. */
-export function pullFromIndex(source: ReadIndexRow): IndexedPullRequest {
+export function pullFromIndex(source: ReadIndexRow, issues: IssueIntent[] = []): IndexedPullRequest {
 	const document = object(source.document.document ?? source.document);
+	const branch = string(object(document.head).ref);
+	// Python's service.github_reads.TASK_BRANCH uses this exact contribution identity.
+	const match = /^concurro\/issue-([1-9][0-9]*)-[0-9a-f]+$/.exec(branch);
+	const issue = match ? issues.find((item) => item.issue === Number(match[1])) : undefined;
 	return {
+		issue: issue ? { owner: issue.owner, repo: issue.repo, issue: issue.issue } : undefined,
+		workflowStage: issue?.workflowStage,
 		number: integer(document.number) || Number(source.item_id),
 		title: string(document.title) || `Pull request #${source.item_id}`,
 		state: document.merged_at || document.merged === true ? 'merged' : string(document.state) || 'unknown',
 		draft: document.draft === true,
-		branch: string(object(document.head).ref), baseBranch: string(object(document.base).ref),
+		branch, baseBranch: string(object(document.base).ref),
 		headSha: string(object(document.head).sha),
 		updatedAt: string(document.updated_at) || source.source_at
 	};

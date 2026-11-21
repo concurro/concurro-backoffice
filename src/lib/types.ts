@@ -153,6 +153,8 @@ export interface Sponsorship {
 export interface IssueIntent extends IssueRef {
     /** GitHub issue state, when present in the retained index. */
     state?: string;
+    /** Concurro workflow stage observed in the issue labels, separate from GitHub state. */
+    workflowStage?: string;
     title: string;
     author: string;
     labels: string[];
@@ -765,6 +767,10 @@ export interface Overview {
 
 /** GitHub PR metadata retained independently of a current Concurro task. */
 export interface IndexedPullRequest {
+	/** Source issue identified by the Concurro task branch, when present in the issue index. */
+	issue?: IssueRef;
+	/** Source issue workflow stage; absence does not imply readiness. */
+	workflowStage?: string;
 	/** Upstream PR identity and title. */
 	number: number;
 	title: string;

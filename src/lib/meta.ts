@@ -64,8 +64,8 @@ export const stageMeta: Record<Stage, Meta> = {
 	implement: m('Implementing', 'info', Hammer),
 	publish: m('Publishing', 'info', Upload),
 	review: m('PR review', 'info', GitPullRequest),
-	gates: m('Ready for humans', 'success', CircleCheck),
-	ready: m('Ready for humans', 'success', CircleCheck),
+	gates: m('Merge signoff', 'success', CircleCheck),
+	ready: m('Merge signoff', 'success', CircleCheck),
 	/** Legacy: set only by older engines; current engines record every human merge as `observed_merged`. */
 	merged: m('Merged', 'accent', GitMerge),
 	observed_merged: m('Merged', 'accent', GitMerge),

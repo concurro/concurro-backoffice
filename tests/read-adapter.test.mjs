@@ -155,3 +155,40 @@ test('sparse retained rows do not invent PR state, head or branch', () => {
     assert.equal(pull.headSha, '');
     assert.equal(pull.updatedAt, '2026-11-21T10:00:00Z');
 });
+
+test('GitHub-open issues and their PRs retain the independent Concurro stage', () => {
+    // The former Python summary used stage labels, and pulls_by_issue used TASK_BRANCH.
+    for (const stage of ['gates', 'ready', 'planned', 'clarify', 'blocked', 'stopped', 'budget_exhausted']) {
+        const issue = issueFromIndex({ item_id: '26', source_at: '', document: {
+            number: 26, state: 'open', labels: [{ name: 'concurro' }, { name: `concurro:stage:${stage.replaceAll('_', '-')}` }]
+        } }, 'acme/issues');
+        const pull = pullFromIndex({ item_id: '44', source_at: '', document: {
+            state: 'open', head: { ref: 'concurro/issue-26-caa1cb253880' }
+        } }, [issue]);
+        assert.equal(issue.state, 'open');
+        assert.equal(issue.workflowStage, stage);
+        assert.equal(pull.state, 'open');
+        assert.equal(pull.workflowStage, stage);
+        assert.deepEqual(pull.issue, { owner: 'acme', repo: 'issues', issue: 26 });
+    }
+});
+
+test('absent or conflicting workflow evidence never implies merge readiness', () => {
+    for (const labels of [[], ['concurro'], ['concurro:stage:gates', 'concurro:stage:blocked']]) {
+        const issue = issueFromIndex({ item_id: '26', source_at: '', document: { labels, state: 'open' } }, 'acme/issues');
+        assert.equal(issue.workflowStage, undefined);
+    }
+    const unknown = issueFromIndex({ item_id: '26', source_at: '', document: {
+        labels: ['concurro:stage:future-stage'], state: 'open'
+    } }, 'acme/issues');
+    assert.equal(unknown.workflowStage, 'future_stage');
+});
+
+test('unrelated PR branches cannot borrow an issue workflow stage', () => {
+    const issues = [{ owner: 'acme', repo: 'issues', issue: 26, workflowStage: 'gates' }];
+    for (const branch of ['feature/26', 'concurro/issue-026-abcd', 'concurro/issue-26-abcd/other', 'concurro/issue-27-abcd']) {
+        const pull = pullFromIndex({ item_id: '44', source_at: '', document: { head: { ref: branch } } }, issues);
+        assert.equal(pull.issue, undefined);
+        assert.equal(pull.workflowStage, undefined);
+    }
+});

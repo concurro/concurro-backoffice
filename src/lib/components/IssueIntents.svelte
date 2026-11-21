@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { reviewStageMeta } from '#lib/meta.ts';
 	import { recoveryQueued } from '#lib/credentials.ts';
 	import type { IssueIntent } from '#lib/types.ts';
 	import { issueHref, relTime } from '#lib/format.ts';
@@ -14,7 +15,7 @@
 {#if rows.length}
 	<Panel flush title="Issues" meta={String(rows.length)}>
 		<DataTable label="Issues">
-			<thead><tr><th class="r">#</th><th>Issue</th><th>State</th><th>Labels</th>{#if hasFunding}<th>Funding</th>{/if}<th class="r">Updated</th></tr></thead>
+			<thead><tr><th class="r">#</th><th>Issue</th><th>Stage</th><th>GitHub state</th><th>Labels</th>{#if hasFunding}<th>Funding</th>{/if}<th class="r">Updated</th></tr></thead>
 			<tbody>
 				{#each rows as issue (`${issue.owner}/${issue.repo}#${issue.issue}`)}
 					<tr>
@@ -23,6 +24,7 @@
 							<a href={issueHref(issue)}><Inline text={issue.title} /></a>
 							<p class="sub"><span class="mono">{issue.owner}/{issue.repo}</span>{#if issue.author} · opened by {issue.author}{/if}</p>
 						</td>
+						<td class="nowrap">{#if issue.workflowStage}<Badge meta={reviewStageMeta(issue.workflowStage)} />{:else}<span class="muted">—</span>{/if}</td>
 						<td class="nowrap"><Badge plain tone={issue.state === 'open' ? 'success' : 'neutral'}>{issue.state === 'open' ? 'Open' : issue.state === 'closed' ? 'Closed' : 'Unknown'}</Badge></td>
 						<td><div class="labels">{#each issue.labels as label}<Badge plain tone="neutral">{label}</Badge>{:else}<span class="muted">—</span>{/each}</div></td>
 						{#if hasFunding}<td>
